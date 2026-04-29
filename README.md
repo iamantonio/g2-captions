@@ -18,6 +18,8 @@ Implemented so far:
 - Browser/WebView wiring for temporary tokens and WebSocket sessions
 - Deterministic silent PCM fixture streaming
 - Real speech PCM smoke fixture streaming
+- Structured latency telemetry and visible telemetry JSON
+- Multi-utterance fixture benchmark harness with WER-lite, vocabulary, and speaker-label scoring
 - Lens-style text rendering helper
 - Visual-only status and error states
 - Test/build/packaging smoke path
@@ -62,6 +64,7 @@ cp .env.example .env
 npm test          # run Vitest suite
 npm run build     # type-check and build
 npm run prototype # run fixture-only prototype from Node
+npm run benchmark:fixtures # generate fixture-only benchmark JSON under artifacts/
 npm run token-broker # start local AssemblyAI temporary-token broker
 ```
 
@@ -110,7 +113,8 @@ Generated outputs (`dist/`, `*.ehpk`, `artifacts/`) are intentionally ignored.
 - `docs/06-pcm-fixture-streaming.md` — paced PCM fixture transport
 - `docs/07-speech-pcm-fixture-smoke.md` — real-speech fixture smoke evidence
 - `docs/08-latency-telemetry.md` — structured benchmark telemetry
+- `docs/09-fixture-benchmark.md` — multi-utterance fixture benchmark
 
 ## Safety gate
 
-The current next gate is to stop before live microphone or G2 SDK audio capture. The next safe step is a small multi-utterance fixture benchmark set.
+The current live-audio gate is to stop before browser microphone or G2 SDK audio capture. Phase 2.2 gives a fixture-only benchmark baseline; browser microphone work should only start with explicit approval.

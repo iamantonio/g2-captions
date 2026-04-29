@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "dev": "vite --host 127.0.0.1",
     "prototype": "tsx tools/run-fixture-prototype.ts",
+    "benchmark:fixtures": "tsx tools/run-fixture-benchmark.ts",
     "token-broker": "tsx tools/assemblyai-token-broker.ts"
   },
   "dependencies": {
