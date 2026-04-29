@@ -1,4 +1,6 @@
 import { waitForEvenAppBridge } from '@evenrealities/even_hub_sdk'
+import { BrowserMicrophonePcmSource } from '../audio/browserMicrophone'
+import { G2SdkAudioSource, type G2AudioBridge } from '../audio/g2SdkAudio'
 import { chunkPcmS16Le, createSilentPcmS16LeFixture, loadPcmS16LeFixtureFromUrl } from '../audio/pcmFixture'
 import { AssemblyAiLiveSession } from '../asr/AssemblyAiLiveSession'
 import { CaptionState } from '../captions/CaptionState'
@@ -13,6 +15,8 @@ const app = document.querySelector<HTMLElement>('#app')
 const state = new CaptionState()
 let session: AssemblyAiLiveSession | undefined
 let g2Display: G2LensDisplay | undefined
+let g2AudioBridge: G2AudioBridge | undefined
+let liveAudioSource: { stop: () => Promise<void> } | undefined
 let lastFrameText = ''
 let telemetry: BenchmarkTelemetryRecorder | undefined
 
@@ -24,6 +28,7 @@ if (app) {
 async function initializeG2Display(): Promise<void> {
   try {
     const bridge = await waitForEvenAppBridge()
+    g2AudioBridge = bridge as unknown as G2AudioBridge
     g2Display = new G2LensDisplay(bridge)
     await renderLens(lastFrameText)
     if (shouldAutoRunHardwareSmoke(new URL(window.location.href), true)) {
@@ -77,10 +82,26 @@ function renderShell(status: string): void {
   streamSpeechFixtureButton.addEventListener('click', () => void streamSpeechFixture())
   app.append(streamSpeechFixtureButton)
 
+  const browserMic = document.createElement('button')
+  browserMic.textContent = 'Start Browser Mic'
+  browserMic.addEventListener('click', () => void startBrowserMicrophone())
+  app.append(browserMic)
+
+  const g2Mic = document.createElement('button')
+  g2Mic.textContent = 'Start G2 SDK Audio'
+  g2Mic.addEventListener('click', () => void startG2SdkAudio())
+  app.append(g2Mic)
+
+  const stopLive = document.createElement('button')
+  stopLive.textContent = 'Stop Live Audio'
+  stopLive.addEventListener('click', () => void stopLiveAudio('LIVE AUDIO STOPPED — captions paused'))
+  app.append(stopLive)
+
   const stop = document.createElement('button')
   stop.textContent = 'Terminate'
   stop.addEventListener('click', () => {
     session?.terminate()
+    void stopLiveAudio('ASR TERMINATED')
     session = undefined
     renderShell('ASR TERMINATED')
   })
@@ -112,10 +133,10 @@ async function runHardwareSpeechSmoke(): Promise<void> {
   await streamSpeechFixture()
 }
 
-async function connectAssemblyAi(): Promise<void> {
+async function connectAssemblyAi(fixtureId = 'speech-smoke'): Promise<void> {
   state.clear()
   session?.terminate()
-  telemetry = createBenchmarkTelemetryRecorder({ provider: 'assemblyai', fixtureId: 'speech-smoke' })
+  telemetry = createBenchmarkTelemetryRecorder({ provider: 'assemblyai', fixtureId })
   session = new AssemblyAiLiveSession({
     tokenEndpoint: getDefaultTokenEndpoint(new URL(window.location.href)),
     keyterms: ['ProvenMachine'],
@@ -149,6 +170,67 @@ async function streamSilentFixture(): Promise<void> {
   } catch {
     // AssemblyAiLiveSession already rendered a visual failure state.
   }
+}
+
+async function startBrowserMicrophone(): Promise<void> {
+  await ensureAssemblyAiConnected('browser-mic')
+  if (!session) return
+  await stopLiveAudio('BROWSER MIC RESTARTING — captions paused', false)
+  const source = new BrowserMicrophonePcmSource({
+    onVisualStatus: renderShell,
+    onChunk: async (chunk) => {
+      try {
+        await session?.sendPcmChunk(chunk)
+      } catch {
+        renderShell('BROWSER MIC STREAM FAILED — captions paused')
+      }
+    },
+  })
+  liveAudioSource = source
+  try {
+    await source.start()
+  } catch {
+    liveAudioSource = undefined
+  }
+}
+
+async function startG2SdkAudio(): Promise<void> {
+  await ensureAssemblyAiConnected('g2-sdk-audio')
+  if (!session) return
+  if (!g2AudioBridge) {
+    renderShell('G2 MIC FAILED — bridge unavailable')
+    return
+  }
+  await stopLiveAudio('G2 MIC RESTARTING — captions paused', false)
+  const source = new G2SdkAudioSource({
+    bridge: g2AudioBridge,
+    onVisualStatus: renderShell,
+    onChunk: async (chunk) => {
+      try {
+        await session?.sendPcmChunk(chunk)
+      } catch {
+        renderShell('G2 MIC STREAM FAILED — captions paused')
+      }
+    },
+  })
+  liveAudioSource = source
+  try {
+    await source.start()
+  } catch {
+    liveAudioSource = undefined
+  }
+}
+
+async function ensureAssemblyAiConnected(fixtureId: string): Promise<void> {
+  if (session) return
+  telemetry = createBenchmarkTelemetryRecorder({ provider: 'assemblyai', fixtureId })
+  await connectAssemblyAi(fixtureId)
+}
+
+async function stopLiveAudio(status: string, render = true): Promise<void> {
+  await liveAudioSource?.stop()
+  liveAudioSource = undefined
+  if (render) renderShell(status)
 }
 
 async function streamSpeechFixture(): Promise<void> {

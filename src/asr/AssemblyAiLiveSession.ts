@@ -95,6 +95,15 @@ export class AssemblyAiLiveSession {
     this.options.onVisualStatus('AUDIO FIXTURE SENT — waiting ASR')
   }
 
+  async sendPcmChunk(chunk: PcmChunk): Promise<void> {
+    const openState = this.WebSocketCtor.OPEN ?? 1
+    if (!this.socket || this.socket.readyState !== openState) {
+      this.options.onVisualStatus('AUDIO STREAM FAILED — ASR not connected')
+      throw new Error('AssemblyAI WebSocket is not connected')
+    }
+    this.socket.send(chunk.data)
+  }
+
   terminate(): void {
     const openState = this.WebSocketCtor.OPEN ?? 1
     if (this.socket && this.socket.readyState === openState) {

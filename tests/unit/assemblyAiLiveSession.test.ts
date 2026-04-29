@@ -110,6 +110,31 @@ describe('AssemblyAiLiveSession', () => {
     expect(onVisualStatus).toHaveBeenCalledWith('ASR MESSAGE FAILED — captions paused')
   })
 
+  it('streams a single live PCM chunk without pacing sleep', async () => {
+    FakeWebSocket.instances = []
+    const sleep = vi.fn(async () => undefined)
+    const session = new AssemblyAiLiveSession({
+      tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
+      fetchImpl: vi.fn(async () =>
+        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onTranscript: vi.fn(),
+      onVisualStatus: vi.fn(),
+      sleep,
+    })
+
+    await session.connect()
+    const chunk = { seq: 1, data: new ArrayBuffer(4), durationMs: 100 }
+    await session.sendPcmChunk(chunk)
+
+    expect(FakeWebSocket.instances[0].sent).toEqual([chunk.data])
+    expect(sleep).not.toHaveBeenCalled()
+  })
+
   it('emits structured telemetry for token, websocket, audio, transcript, and terminate events', async () => {
     FakeWebSocket.instances = []
     const onTelemetry = vi.fn()
@@ -134,6 +159,7 @@ describe('AssemblyAiLiveSession', () => {
       { seq: 1, data: new ArrayBuffer(4), durationMs: 100 },
       { seq: 2, data: new ArrayBuffer(4), durationMs: 100 },
     ])
+    await session.sendPcmChunk({ seq: 3, data: new ArrayBuffer(4), durationMs: 100 })
     FakeWebSocket.instances[0].onmessage?.(
       new MessageEvent('message', {
         data: JSON.stringify({ type: 'Turn', transcript: 'hello', end_of_turn: false }),

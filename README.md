@@ -20,14 +20,14 @@ Implemented so far:
 - Real speech PCM smoke fixture streaming
 - Structured latency telemetry and visible telemetry JSON
 - Multi-utterance fixture benchmark harness with WER-lite, vocabulary, and speaker-label scoring
+- Opt-in browser microphone prototype path after approval
+- Opt-in G2 SDK audio prototype path after approval
 - Lens-style text rendering helper
 - Visual-only status and error states
 - Test/build/packaging smoke path
 
 Not implemented yet:
 
-- Live microphone capture
-- G2 SDK audio capture
 - BLE writes
 - always-on/background capture
 - production benchmark claims versus Conversate
@@ -64,8 +64,9 @@ cp .env.example .env
 npm test          # run Vitest suite
 npm run build     # type-check and build
 npm run prototype # run fixture-only prototype from Node
-npm run benchmark:fixtures # generate fixture-only benchmark JSON under artifacts/
-npm run token-broker # start local AssemblyAI temporary-token broker
+npm run benchmark:fixtures # generate fixture-only benchmark JSON
+npm run hardware:readiness # print LAN QR/probe checklist for G2 smoke testing
+npm run token-broker       # local temporary-token broker (requires ASSEMBLYAI_API_KEY)
 ```
 
 ## Live AssemblyAI smoke test
@@ -75,7 +76,7 @@ Live cloud ASR requires a local token broker so the browser app receives only te
 Terminal 1:
 
 ```bash
-export ASSEMBLYAI_API_KEY="..."
+export ASSEMBLYAI_API_KEY="your_assemblyai_api_key_here"
 npm run token-broker
 ```
 
@@ -114,7 +115,9 @@ Generated outputs (`dist/`, `*.ehpk`, `artifacts/`) are intentionally ignored.
 - `docs/07-speech-pcm-fixture-smoke.md` — real-speech fixture smoke evidence
 - `docs/08-latency-telemetry.md` — structured benchmark telemetry
 - `docs/09-fixture-benchmark.md` — multi-utterance fixture benchmark
+- `docs/10-live-audio-gates.md` — approved browser mic and G2 SDK audio capture gates
+- `docs/11-hardware-smoke.md` — hardware/device smoke plan
 
 ## Safety gate
 
-The current live-audio gate is to stop before browser microphone or G2 SDK audio capture. Phase 2.2 gives a fixture-only benchmark baseline; browser microphone work should only start with explicit approval.
+Browser microphone and G2 SDK audio paths are now explicit opt-in prototype controls after approval. Do not make continuous-use, background, phone-lock, or Conversate superiority claims until physical hardware benchmark evidence exists.
