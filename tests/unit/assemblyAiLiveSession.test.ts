@@ -5,7 +5,7 @@ import { buildAssemblyAiTerminateMessage } from '../../src/asr/AssemblyAiStreami
 class FakeWebSocket {
   static readonly OPEN = 1
   static instances: FakeWebSocket[] = []
-  readonly sent: string[] = []
+  readonly sent: Array<string | ArrayBuffer> = []
   readyState = FakeWebSocket.OPEN
   onopen: ((event: Event) => void) | null = null
   onmessage: ((event: MessageEvent<string>) => void) | null = null
@@ -17,7 +17,7 @@ class FakeWebSocket {
     queueMicrotask(() => this.onopen?.(new Event('open')))
   }
 
-  send(data: string) {
+  send(data: string | ArrayBuffer) {
     this.sent.push(data)
   }
 
@@ -108,5 +108,51 @@ describe('AssemblyAiLiveSession', () => {
     FakeWebSocket.instances[0].onmessage?.(new MessageEvent('message', { data: '{' }))
 
     expect(onVisualStatus).toHaveBeenCalledWith('ASR MESSAGE FAILED — captions paused')
+  })
+
+  it('emits structured telemetry for token, websocket, audio, transcript, and terminate events', async () => {
+    FakeWebSocket.instances = []
+    const onTelemetry = vi.fn()
+    const nowValues = [1000, 1010, 1100, 1200, 1300]
+    const session = new AssemblyAiLiveSession({
+      tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
+      fetchImpl: vi.fn(async () =>
+        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      nowMs: () => nowValues.shift() ?? 9999,
+      onTranscript: vi.fn(),
+      onVisualStatus: vi.fn(),
+      onTelemetry,
+    })
+
+    await session.connect()
+    await session.streamPcmChunks([
+      { seq: 1, data: new ArrayBuffer(4), durationMs: 100 },
+      { seq: 2, data: new ArrayBuffer(4), durationMs: 100 },
+    ])
+    FakeWebSocket.instances[0].onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify({ type: 'Turn', transcript: 'hello', end_of_turn: false }),
+      }),
+    )
+    FakeWebSocket.instances[0].onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify({ type: 'Turn', transcript: 'hello Tony', end_of_turn: true, speaker_label: 'A' }),
+      }),
+    )
+    session.terminate()
+
+    expect(onTelemetry).toHaveBeenCalledWith('token_request_start')
+    expect(onTelemetry).toHaveBeenCalledWith('token_request_end')
+    expect(onTelemetry).toHaveBeenCalledWith('websocket_open')
+    expect(onTelemetry).toHaveBeenCalledWith('first_audio_chunk_sent', { seq: 1 })
+    expect(onTelemetry).toHaveBeenCalledWith('final_audio_chunk_sent', { seq: 2 })
+    expect(onTelemetry).toHaveBeenCalledWith('first_partial_received', { transcript: 'hello' })
+    expect(onTelemetry).toHaveBeenCalledWith('final_transcript_received', { transcript: 'hello Tony', speaker: 'A' })
+    expect(onTelemetry).toHaveBeenCalledWith('provider_terminate_sent')
   })
 })

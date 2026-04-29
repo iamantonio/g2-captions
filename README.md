@@ -109,7 +109,8 @@ Generated outputs (`dist/`, `*.ehpk`, `artifacts/`) are intentionally ignored.
 - `docs/05-webview-client-wiring.md` — browser/WebView live session wiring
 - `docs/06-pcm-fixture-streaming.md` — paced PCM fixture transport
 - `docs/07-speech-pcm-fixture-smoke.md` — real-speech fixture smoke evidence
+- `docs/08-latency-telemetry.md` — structured benchmark telemetry
 
 ## Safety gate
 
-The current next gate is to stop before live microphone or G2 SDK audio capture. The next safe step is structured latency telemetry and a small multi-utterance fixture set.
+The current next gate is to stop before live microphone or G2 SDK audio capture. The next safe step is a small multi-utterance fixture benchmark set.

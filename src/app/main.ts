@@ -3,6 +3,7 @@ import { chunkPcmS16Le, createSilentPcmS16LeFixture, loadPcmS16LeFixtureFromUrl 
 import { AssemblyAiLiveSession } from '../asr/AssemblyAiLiveSession'
 import { CaptionState } from '../captions/CaptionState'
 import { formatCaptionFrame } from '../captions/formatter'
+import { createBenchmarkTelemetryRecorder, type BenchmarkTelemetryRecorder } from '../captions/latency'
 import { G2LensDisplay } from '../display/g2LensDisplay'
 import type { RawAsrEvent } from '../types'
 import { runFixturePrototype } from './runFixturePrototype'
@@ -13,6 +14,7 @@ const state = new CaptionState()
 let session: AssemblyAiLiveSession | undefined
 let g2Display: G2LensDisplay | undefined
 let lastFrameText = ''
+let telemetry: BenchmarkTelemetryRecorder | undefined
 
 if (app) {
   renderShell('READY — token broker required')
@@ -58,6 +60,7 @@ function renderShell(status: string): void {
   pre.textContent = frame.text
   app.append(pre)
   void renderLens(frame.text)
+  renderTelemetryReport()
 
   const connect = document.createElement('button')
   connect.textContent = 'Connect AssemblyAI'
@@ -84,6 +87,24 @@ function renderShell(status: string): void {
   app.append(stop)
 }
 
+function renderTelemetryReport(): void {
+  if (!app || !telemetry) return
+  const report = telemetry.report()
+  if (report.events.length === 0) return
+
+  const details = document.createElement('details')
+  details.open = true
+  const summary = document.createElement('summary')
+  summary.textContent = 'Telemetry JSON'
+  details.append(summary)
+
+  const reportPre = document.createElement('pre')
+  reportPre.setAttribute('aria-label', 'Latest benchmark telemetry JSON')
+  reportPre.textContent = JSON.stringify(report, null, 2)
+  details.append(reportPre)
+  app.append(details)
+}
+
 async function runHardwareSpeechSmoke(): Promise<void> {
   renderShell('HARDWARE SMOKE — connecting ASR')
   await connectAssemblyAi()
@@ -94,14 +115,18 @@ async function runHardwareSpeechSmoke(): Promise<void> {
 async function connectAssemblyAi(): Promise<void> {
   state.clear()
   session?.terminate()
+  telemetry = createBenchmarkTelemetryRecorder({ provider: 'assemblyai', fixtureId: 'speech-smoke' })
   session = new AssemblyAiLiveSession({
     tokenEndpoint: getDefaultTokenEndpoint(new URL(window.location.href)),
     keyterms: ['ProvenMachine'],
     onTranscript: (event: RawAsrEvent) => {
       state.applyAsrEvent(event)
+      telemetry?.mark('caption_formatted')
+      telemetry?.mark('display_update_sent')
       renderShell('ASR CONNECTED — waiting audio')
     },
     onVisualStatus: renderShell,
+    onTelemetry: (stage, details) => telemetry?.mark(stage, details),
   })
 
   try {

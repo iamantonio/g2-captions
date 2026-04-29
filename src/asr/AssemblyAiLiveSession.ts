@@ -1,4 +1,5 @@
 import type { PcmChunk } from '../audio/pcmFixture'
+import type { BenchmarkTelemetryDetails, BenchmarkTelemetryStage } from '../captions/latency'
 import type { RawAsrEvent } from '../types'
 import {
   buildAssemblyAiStreamingUrl,
@@ -14,6 +15,7 @@ export interface AssemblyAiLiveSessionOptions {
   nowMs?: () => number
   onTranscript: (event: RawAsrEvent) => void
   onVisualStatus: (message: string) => void
+  onTelemetry?: (stage: BenchmarkTelemetryStage, details?: BenchmarkTelemetryDetails) => void
   keyterms?: string[]
   maxSpeakers?: number
   sleep?: (ms: number) => Promise<void>
@@ -40,7 +42,9 @@ export class AssemblyAiLiveSession {
 
   async connect(): Promise<void> {
     this.options.onVisualStatus('CONNECTING — token')
+    this.markTelemetry('token_request_start')
     const token = await this.fetchTemporaryToken()
+    this.markTelemetry('token_request_end')
 
     this.options.onVisualStatus('CONNECTING — ASR')
     const url = buildAssemblyAiStreamingUrl({
@@ -56,14 +60,19 @@ export class AssemblyAiLiveSession {
         return
       }
       this.socket.onopen = () => {
+        this.markTelemetry('websocket_open')
         this.options.onVisualStatus('ASR CONNECTED — waiting audio')
         resolve()
       }
       this.socket.onerror = () => {
+        this.markTelemetry('websocket_error')
         this.options.onVisualStatus('ASR CONNECTION FAILED — captions paused')
         reject(new Error('AssemblyAI WebSocket connection failed'))
       }
-      this.socket.onclose = () => this.options.onVisualStatus('ASR CLOSED — captions paused')
+      this.socket.onclose = () => {
+        this.markTelemetry('websocket_closed')
+        this.options.onVisualStatus('ASR CLOSED — captions paused')
+      }
       this.socket.onmessage = (event: MessageEvent) => this.handleMessage(event)
     })
   }
@@ -76,10 +85,13 @@ export class AssemblyAiLiveSession {
     }
 
     this.options.onVisualStatus('AUDIO FIXTURE STREAMING')
+    if (chunks[0]) this.markTelemetry('first_audio_chunk_sent', { seq: chunks[0].seq })
     for (const chunk of chunks) {
       this.socket.send(chunk.data)
       await this.sleep(chunk.durationMs)
     }
+    const finalChunk = chunks.at(-1)
+    if (finalChunk) this.markTelemetry('final_audio_chunk_sent', { seq: finalChunk.seq })
     this.options.onVisualStatus('AUDIO FIXTURE SENT — waiting ASR')
   }
 
@@ -87,6 +99,7 @@ export class AssemblyAiLiveSession {
     const openState = this.WebSocketCtor.OPEN ?? 1
     if (this.socket && this.socket.readyState === openState) {
       this.socket.send(buildAssemblyAiTerminateMessage())
+      this.markTelemetry('provider_terminate_sent')
       this.socket = undefined
       return
     }
@@ -121,6 +134,11 @@ export class AssemblyAiLiveSession {
     try {
       const payload = JSON.parse(String(event.data)) as AssemblyAiTurnEvent
       if (payload.type !== 'Turn') return
+      const telemetryDetails: BenchmarkTelemetryDetails = { transcript: String(payload.transcript ?? '') }
+      if (typeof payload.speaker_label === 'string' && payload.speaker_label.trim()) {
+        telemetryDetails.speaker = payload.speaker_label
+      }
+      this.markTelemetry(payload.end_of_turn ? 'final_transcript_received' : 'first_partial_received', telemetryDetails)
       this.options.onTranscript(
         mapAssemblyAiTurnToRawAsrEvent(payload, {
           receivedAtMs: this.nowMs(),
@@ -130,5 +148,13 @@ export class AssemblyAiLiveSession {
     } catch (error) {
       this.options.onVisualStatus('ASR MESSAGE FAILED — captions paused')
     }
+  }
+
+  private markTelemetry(stage: BenchmarkTelemetryStage, details?: BenchmarkTelemetryDetails): void {
+    if (details === undefined) {
+      this.options.onTelemetry?.(stage)
+      return
+    }
+    this.options.onTelemetry?.(stage, details)
   }
 }

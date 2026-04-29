@@ -14,6 +14,99 @@ export interface LatencySummary {
 
 const TARGET_MS = 800
 
+export type BenchmarkTelemetryStage =
+  | 'token_request_start'
+  | 'token_request_end'
+  | 'websocket_open'
+  | 'first_audio_chunk_sent'
+  | 'final_audio_chunk_sent'
+  | 'provider_terminate_sent'
+  | 'first_partial_received'
+  | 'final_transcript_received'
+  | 'caption_formatted'
+  | 'display_update_sent'
+  | 'websocket_closed'
+  | 'websocket_error'
+
+export interface BenchmarkTelemetryDetails {
+  seq?: number
+  transcript?: string
+  speaker?: string
+  message?: string
+}
+
+export interface BenchmarkTelemetryEvent extends BenchmarkTelemetryDetails {
+  stage: BenchmarkTelemetryStage
+  atMs: number
+}
+
+export interface BenchmarkTelemetryMetrics {
+  tokenRequestMs?: number
+  websocketOpenFromStartMs?: number
+  firstPartialFromFirstAudioMs?: number
+  finalTranscriptFromFirstAudioMs?: number
+  displayUpdateFromFinalTranscriptMs?: number
+}
+
+export interface BenchmarkTelemetryReport {
+  provider: string
+  fixtureId: string
+  startedAtMs: number
+  events: BenchmarkTelemetryEvent[]
+  metrics: BenchmarkTelemetryMetrics
+}
+
+export interface BenchmarkTelemetryRecorderOptions {
+  provider: string
+  fixtureId: string
+  nowMs?: () => number
+}
+
+export interface BenchmarkTelemetryRecorder {
+  mark: (stage: BenchmarkTelemetryStage, details?: BenchmarkTelemetryDetails) => void
+  report: () => BenchmarkTelemetryReport
+}
+
+export function createBenchmarkTelemetryRecorder(options: BenchmarkTelemetryRecorderOptions): BenchmarkTelemetryRecorder {
+  const nowMs = options.nowMs ?? Date.now
+  const events: BenchmarkTelemetryEvent[] = []
+
+  return {
+    mark(stage, details = {}) {
+      events.push({ stage, atMs: nowMs(), ...details })
+    },
+    report() {
+      const snapshot = events.map((event) => ({ ...event }))
+      return {
+        provider: options.provider,
+        fixtureId: options.fixtureId,
+        startedAtMs: snapshot[0]?.atMs ?? nowMs(),
+        events: snapshot,
+        metrics: calculateBenchmarkTelemetryMetrics(snapshot),
+      }
+    },
+  }
+}
+
+function calculateBenchmarkTelemetryMetrics(events: BenchmarkTelemetryEvent[]): BenchmarkTelemetryMetrics {
+  const first = (stage: BenchmarkTelemetryStage) => events.find((event) => event.stage === stage)
+  const tokenStart = first('token_request_start')
+  const tokenEnd = first('token_request_end')
+  const websocketOpen = first('websocket_open')
+  const firstAudio = first('first_audio_chunk_sent')
+  const firstPartial = first('first_partial_received')
+  const finalTranscript = first('final_transcript_received')
+  const displayUpdate = first('display_update_sent')
+
+  return {
+    ...(tokenStart && tokenEnd ? { tokenRequestMs: tokenEnd.atMs - tokenStart.atMs } : {}),
+    ...(tokenStart && websocketOpen ? { websocketOpenFromStartMs: websocketOpen.atMs - tokenStart.atMs } : {}),
+    ...(firstAudio && firstPartial ? { firstPartialFromFirstAudioMs: firstPartial.atMs - firstAudio.atMs } : {}),
+    ...(firstAudio && finalTranscript ? { finalTranscriptFromFirstAudioMs: finalTranscript.atMs - firstAudio.atMs } : {}),
+    ...(finalTranscript && displayUpdate ? { displayUpdateFromFinalTranscriptMs: displayUpdate.atMs - finalTranscript.atMs } : {}),
+  }
+}
+
 export function summarizeLatencyBudget(events: LatencyEvent[]): LatencySummary {
   const bySeq = new Map<number, LatencyEvent[]>()
   for (const event of events) {
