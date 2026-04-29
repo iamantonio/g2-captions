@@ -1,0 +1,23 @@
+{
+  "name": "g2-captions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc && vite build",
+    "dev": "vite --host 127.0.0.1",
+    "prototype": "tsx tools/run-fixture-prototype.ts",
+    "token-broker": "tsx tools/assemblyai-token-broker.ts"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "^0.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.4",
+    "vitest": "^3.1.2"
+  }
+}
