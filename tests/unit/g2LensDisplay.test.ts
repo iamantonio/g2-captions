@@ -124,4 +124,19 @@ describe('G2 lens caption display', () => {
     if (result.ok !== false) throw new Error('expected update failure')
     expect(result.visualStatus).toBe('G2 DISPLAY FAILED — caption update failed')
   })
+
+  it('still upgrades the lens when the first frame happens to match the startup constant', async () => {
+    const bridge = {
+      createStartUpPageContainer: vi.fn().mockResolvedValue(0),
+      textContainerUpgrade: vi.fn().mockResolvedValue(true),
+    }
+    const display = new G2LensDisplay(bridge)
+
+    const result = await display.render(G2_STARTUP_CONTENT)
+
+    expect(result).toEqual({ ok: true })
+    expect(bridge.createStartUpPageContainer).toHaveBeenCalledTimes(1)
+    expect(bridge.textContainerUpgrade).toHaveBeenCalledTimes(1)
+    expect(bridge.textContainerUpgrade.mock.calls[0][0].content).toBe(G2_STARTUP_CONTENT)
+  })
 })

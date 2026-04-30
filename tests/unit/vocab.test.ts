@@ -28,4 +28,20 @@ describe('applyVocabularyCorrections', () => {
       { from: 'gee two', to: 'G2', category: 'device' },
     ])
   })
+
+  it('does not double-correct when a higher-priority match overlaps a lower-priority alias', () => {
+    // Higher-priority entry's match would overlap the lower-priority alias if
+    // applied naively in sequence. Only the higher-priority canonical wins.
+    const vocab: VocabularyEntry[] = [
+      { canonical: 'Speech Pro Suite', aliases: ['speech pro suite'], category: 'product', priority: 10 },
+      { canonical: 'Pro Account', aliases: ['pro suite'], category: 'plan', priority: 5 },
+    ]
+
+    const result = applyVocabularyCorrections('we shipped the speech pro suite today', vocab)
+
+    expect(result.text).toBe('we shipped the Speech Pro Suite today')
+    expect(result.corrections).toEqual([
+      { from: 'speech pro suite', to: 'Speech Pro Suite', category: 'product' },
+    ])
+  })
 })

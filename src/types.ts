@@ -46,7 +46,19 @@ export interface FixtureAsrScriptEvent {
   endMs: number
 }
 
-export type VisualStatusKind = 'mic-blocked' | 'g2-disconnected' | 'network-slow' | 'g2-mic-lost' | 'asr-lost' | 'vocab-loaded'
+// Runtime-enumerable list of visual-only failure / state kinds. Tests iterate
+// this constant to guarantee every kind has a deaf-first visual fallback;
+// adding a new kind here forces the type union and exhaustive switches in
+// formatVisualStatus to update.
+export const VISUAL_STATUS_KINDS = [
+  'mic-blocked',
+  'g2-disconnected',
+  'network-slow',
+  'g2-mic-lost',
+  'asr-lost',
+  'vocab-loaded',
+] as const
+export type VisualStatusKind = (typeof VISUAL_STATUS_KINDS)[number]
 
 export interface LatencyEvent {
   seq: number

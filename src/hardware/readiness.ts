@@ -23,11 +23,15 @@ export function isPrivateLanIp(ip: string): boolean {
 
 export function buildHardwareSmokeUrls(lanIp: string): HardwareSmokeUrls {
   const viteUrl = `http://${lanIp}:5173`
+  // Append ?autoSmoke=1 so the WebView kicks off the documented hardware-smoke
+  // flow on load. shouldAutoRunHardwareSmoke is opt-in; the QR is the consent
+  // signal for live-cloud audio.
+  const smokeUrl = `${viteUrl}?autoSmoke=1`
   return {
     lanIp,
     viteUrl,
     tokenBrokerUrl: `http://${lanIp}:8787/deepgram/token`,
-    qrCommand: `evenhub qr --url "${viteUrl}"`,
+    qrCommand: `evenhub qr --url "${smokeUrl}"`,
   }
 }
 

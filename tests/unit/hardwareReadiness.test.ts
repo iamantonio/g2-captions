@@ -12,7 +12,7 @@ describe('hardware readiness helpers', () => {
 
     expect(urls.viteUrl).toBe('http://192.168.1.42:5173')
     expect(urls.tokenBrokerUrl).toBe('http://192.168.1.42:8787/deepgram/token')
-    expect(urls.qrCommand).toBe('evenhub qr --url "http://192.168.1.42:5173"')
+    expect(urls.qrCommand).toBe('evenhub qr --url "http://192.168.1.42:5173?autoSmoke=1"')
   })
 
   it('flags public or loopback addresses as not hardware reachable', () => {

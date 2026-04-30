@@ -36,9 +36,15 @@ export interface AssemblyAiTurnMapContext {
   fallbackStartMs: number
 }
 
+// AssemblyAI raw API keys are 32-character hex (and never sent to the WebView).
+// Reject anything that matches that shape to catch a pasted key. Also reject
+// OpenAI-style sk_ / sk- prefixes as belt-and-braces against pasted credentials.
+const ASSEMBLYAI_API_KEY_SHAPE = /^[a-f0-9]{32}$/i
+const OPENAI_KEY_PREFIX = /^sk[_-]/i
+
 export function validateAssemblyAiToken(token: string): string {
   const trimmed = token.trim()
-  if (!trimmed || /^sk[_-]/i.test(trimmed)) {
+  if (!trimmed || ASSEMBLYAI_API_KEY_SHAPE.test(trimmed) || OPENAI_KEY_PREFIX.test(trimmed)) {
     throw new Error('AssemblyAI streaming requires a temporary token; never embed an API key in the WebView')
   }
   return trimmed

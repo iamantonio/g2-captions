@@ -45,13 +45,15 @@ function formatHeader(title: string, latencyMs?: number): string {
 }
 
 function formatFooter(status: string): string {
-  const normalized = status.replace(/[\u2013\u2014]/g, '-').trim()
+  const trimmed = status.trim()
+  // Patterns accept ASCII hyphen, en-dash, em-dash to decouple matching from
+  // any upstream dash-normalization step.
   const statusMap: Array<[RegExp, string]> = [
     [/^G2 MIC LIVE/i, 'LIVE G2 MIC'],
     [/^BROWSER MIC LIVE/i, 'LIVE PHONE MIC'],
     [/^ASR CONNECTED/i, 'ASR READY'],
-    [/^CONNECTING - token/i, 'TOKEN...'],
-    [/^CONNECTING - ASR/i, 'ASR CONNECTING'],
+    [/^CONNECTING\s+[\u2013\u2014-]\s*token/i, 'TOKEN...'],
+    [/^CONNECTING\s+[\u2013\u2014-]\s*ASR/i, 'ASR CONNECTING'],
     [/^G2 MIC STARTING/i, 'G2 MIC STARTING'],
     [/^G2 MIC FAILED/i, 'G2 MIC FAILED'],
     [/^G2 MIC STOPPED/i, 'G2 MIC STOPPED'],
@@ -62,10 +64,12 @@ function formatFooter(status: string): string {
   ]
 
   for (const [pattern, label] of statusMap) {
-    if (pattern.test(normalized)) return label
+    if (pattern.test(trimmed)) return label
   }
 
-  return normalized.length <= 34 ? normalized : `${normalized.slice(0, 31)}...`
+  // Fallback path normalizes Unicode dashes to ASCII for the lens display.
+  const ascii = trimmed.replace(/[\u2013\u2014]/g, '-')
+  return ascii.length <= 34 ? ascii : `${ascii.slice(0, 31)}...`
 }
 
 function selectRecentCaptionLines(segments: CaptionSegment[], width: number, maxLines: number): string[] {
@@ -120,8 +124,13 @@ function wrapSegment(segment: CaptionSegment, width: number): string[] {
 function formatSpeakerChip(label: string): string {
   const trimmed = label.trim().toUpperCase()
   if (!trimmed || trimmed === '?') return '[??]'
-  if (/^[A-Z]$/.test(trimmed)) return `[S${trimmed.charCodeAt(0) - 64}]`
+  // Single letter (AssemblyAI-style A, B, C, …): use the letter directly so
+  // a letter-labelled speaker never collides with a numeric one (e.g. A vs 0).
+  if (/^[A-Z]$/.test(trimmed)) return `[${trimmed}]`
+  // Already-formatted S<n>: pass through.
   if (/^S\d+$/.test(trimmed)) return `[${trimmed}]`
+  // Vendor-numeric (Deepgram-style 0, 1, 2, …): show as S1, S2, … (1-indexed
+  // for the human reader; 0-indexed in the wire format).
   if (/^\d+$/.test(trimmed)) return `[S${Number(trimmed) + 1}]`
   return `[${trimmed.slice(0, 4)}]`
 }

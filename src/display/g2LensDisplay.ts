@@ -69,8 +69,6 @@ export class G2LensDisplay {
       }
 
       this.started = true
-      if (lensContent === G2_STARTUP_CONTENT) return { ok: true }
-      return this.render(lensContent)
     }
 
     const ok = await this.bridge.textContainerUpgrade(

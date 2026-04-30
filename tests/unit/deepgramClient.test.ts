@@ -28,6 +28,11 @@ describe('Deepgram streaming client configuration', () => {
     expect(() => validateDeepgramAccessToken('')).toThrow(/temporary token/i)
     expect(() => validateDeepgramAccessToken('***')).toThrow(/temporary token/i)
   })
+
+  it('rejects strings shaped like a raw 40-character hex Deepgram API key', () => {
+    expect(() => validateDeepgramAccessToken('a'.repeat(40))).toThrow(/temporary token/i)
+    expect(() => validateDeepgramAccessToken('0123456789abcdef0123456789abcdef01234567')).toThrow(/temporary token/i)
+  })
 })
 
 describe('Deepgram result event mapping', () => {

@@ -70,20 +70,26 @@ export interface BenchmarkTelemetryRecorder {
 export function createBenchmarkTelemetryRecorder(options: BenchmarkTelemetryRecorderOptions): BenchmarkTelemetryRecorder {
   const nowMs = options.nowMs ?? Date.now
   const events: BenchmarkTelemetryEvent[] = []
+  let cached: BenchmarkTelemetryReport | undefined
+  let cachedAtLength = -1
 
   return {
     mark(stage, details = {}) {
       events.push({ stage, atMs: nowMs(), ...details })
+      cached = undefined
     },
     report() {
+      if (cached && cachedAtLength === events.length) return cached
       const snapshot = events.map((event) => ({ ...event }))
-      return {
+      cached = {
         provider: options.provider,
         fixtureId: options.fixtureId,
         startedAtMs: snapshot[0]?.atMs ?? nowMs(),
         events: snapshot,
         metrics: calculateBenchmarkTelemetryMetrics(snapshot),
       }
+      cachedAtLength = events.length
+      return cached
     },
   }
 }

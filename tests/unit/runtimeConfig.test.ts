@@ -41,12 +41,17 @@ describe('runtime config for Hub hardware smoke tests', () => {
     )
   })
 
-  it('auto-runs the fixture smoke test on Hub unless disabled by query param', () => {
-    expect(shouldAutoRunHardwareSmoke(new URL('http://172.20.10.5:5173/'), true)).toBe(true)
+  it('auto-runs the fixture smoke test only when explicitly opted in by ?autoSmoke=1', () => {
+    expect(shouldAutoRunHardwareSmoke(new URL('http://172.20.10.5:5173/?autoSmoke=1'), true)).toBe(true)
+  })
+
+  it('does not auto-run by default even on Hub, so live ASR requires consent', () => {
+    expect(shouldAutoRunHardwareSmoke(new URL('http://172.20.10.5:5173/'), true)).toBe(false)
     expect(shouldAutoRunHardwareSmoke(new URL('http://172.20.10.5:5173/?autoSmoke=0'), true)).toBe(false)
   })
 
-  it('does not auto-run outside the Even Hub bridge', () => {
+  it('does not auto-run outside the Even Hub bridge regardless of opt-in flag', () => {
     expect(shouldAutoRunHardwareSmoke(new URL('http://172.20.10.5:5173/'), false)).toBe(false)
+    expect(shouldAutoRunHardwareSmoke(new URL('http://172.20.10.5:5173/?autoSmoke=1'), false)).toBe(false)
   })
 })

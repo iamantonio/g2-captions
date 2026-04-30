@@ -63,4 +63,20 @@ describe('BenchmarkTelemetryRecorder', () => {
     })
     expect(JSON.parse(JSON.stringify(report))).toEqual(report)
   })
+
+  it('returns the same memoized report when called twice without an intervening mark', () => {
+    const recorder = createBenchmarkTelemetryRecorder({
+      provider: 'deepgram',
+      fixtureId: 'memo-test',
+      nowMs: () => 100,
+    })
+    recorder.mark('token_request_start')
+    const first = recorder.report()
+    const second = recorder.report()
+    expect(second).toBe(first)
+
+    recorder.mark('token_request_end')
+    const third = recorder.report()
+    expect(third).not.toBe(first)
+  })
 })

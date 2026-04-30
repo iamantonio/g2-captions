@@ -35,14 +35,14 @@ describe('formatCaptionFrame', () => {
 
     expect(frame.lines).toEqual([
       'G2 CAPTIONS       LIVE 143ms',
-      '[S1] we should move the review to',
-      '     Friday morning',
-      '[S2]* Friday works if the deck is',
-      '      ready by Thursday night',
+      '[A] we should move the review to',
+      '    Friday morning',
+      '[B]* Friday works if the deck is',
+      '     ready by Thursday night',
       'LIVE G2 MIC',
     ])
-    expect(frame.text).toContain('[S1]')
-    expect(frame.text).toContain('[S2]*')
+    expect(frame.text).toContain('[A]')
+    expect(frame.text).toContain('[B]*')
     expect(frame.text).toContain('LIVE G2 MIC')
   })
 
@@ -98,5 +98,41 @@ describe('formatCaptionFrame', () => {
     expect(formatVisualStatus({ kind: 'mic-blocked' })).toBe('MIC BLOCKED — check permission')
     expect(formatVisualStatus({ kind: 'g2-disconnected' })).toBe('G2 DISCONNECTED — captions on phone')
     expect(formatVisualStatus({ kind: 'network-slow' })).toBe('NETWORK SLOW — offline captions')
+  })
+
+  it('disambiguates letter speakers from numeric speakers (no [S1] collision)', () => {
+    const segments: CaptionSegment[] = [
+      { id: 'a', speakerLabel: 'A', text: 'one', status: 'final', startMs: 0, endMs: 500, displayPriority: 1 },
+      { id: 'zero', speakerLabel: '0', text: 'two', status: 'final', startMs: 600, endMs: 1100, displayPriority: 2 },
+    ]
+
+    const frame = formatCaptionFrame(segments, {
+      title: 'G2 CAPTIONS',
+      status: 'ASR CONNECTED — waiting audio',
+      maxLines: 6,
+      lineWidth: 28,
+    })
+
+    expect(frame.text).toContain('[A] one')
+    expect(frame.text).toContain('[S1] two')
+  })
+
+  it('matches the footer regardless of whether the status uses ASCII or em-dash', () => {
+    const baseSegments: CaptionSegment[] = []
+    const ascii = formatCaptionFrame(baseSegments, {
+      title: 'G2 CAPTIONS',
+      status: 'CONNECTING - token',
+      maxLines: 4,
+      lineWidth: 28,
+    })
+    const emdash = formatCaptionFrame(baseSegments, {
+      title: 'G2 CAPTIONS',
+      status: 'CONNECTING — token',
+      maxLines: 4,
+      lineWidth: 28,
+    })
+
+    expect(ascii.lines.at(-1)).toBe('TOKEN...')
+    expect(emdash.lines.at(-1)).toBe('TOKEN...')
   })
 })

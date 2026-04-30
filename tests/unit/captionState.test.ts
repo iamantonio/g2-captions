@@ -87,4 +87,31 @@ describe('CaptionState', () => {
       status: 'final',
     })
   })
+
+  it('keeps two distinct known speakers at the same startMs as separate segments', () => {
+    const state = new CaptionState()
+    state.applyAsrEvent({
+      vendor: 'assemblyai',
+      text: 'over here',
+      status: 'partial',
+      startMs: 0,
+      endMs: 700,
+      speaker: 'A',
+      receivedAtMs: 200,
+    })
+    state.applyAsrEvent({
+      vendor: 'assemblyai',
+      text: 'no over there',
+      status: 'partial',
+      startMs: 0,
+      endMs: 700,
+      speaker: 'B',
+      receivedAtMs: 220,
+    })
+
+    const segments = state.segments()
+    expect(segments).toHaveLength(2)
+    const labels = segments.map((s) => s.speakerLabel).sort()
+    expect(labels).toEqual(['A', 'B'])
+  })
 })

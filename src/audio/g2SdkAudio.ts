@@ -22,6 +22,11 @@ export interface G2SdkAudioSourceOptions {
   inputGain?: number
 }
 
+// Default amplification factor for G2 SDK PCM. Chosen as a conservative starting
+// point; revisit once hardware smoke (docs/11-hardware-smoke.md) supplies a
+// per-device measurement. amplifyPcmS16Le saturates above this point.
+export const DEFAULT_G2_INPUT_GAIN = 4
+
 export function amplifyPcmS16Le(audioPcm: Uint8Array, gain: number): Uint8Array {
   if (!Number.isFinite(gain) || gain <= 1) return new Uint8Array(audioPcm)
 
@@ -75,7 +80,7 @@ export class G2SdkAudioSource {
 
   private handleAudioPcm(audioPcm: Uint8Array): void {
     this.seq += 1
-    const gain = this.options.inputGain ?? 4
+    const gain = this.options.inputGain ?? DEFAULT_G2_INPUT_GAIN
     const durationMs = Math.round((audioPcm.byteLength / 2 / (this.options.sampleRate ?? 16_000)) * 1000)
     this.options.onStageLog?.('g2_audio_pcm_received', {
       byteLength: audioPcm.byteLength,

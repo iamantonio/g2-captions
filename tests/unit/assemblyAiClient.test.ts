@@ -28,6 +28,11 @@ describe('AssemblyAI streaming client configuration', () => {
     expect(() => validateAssemblyAiToken('')).toThrow(/temporary token/i)
     expect(() => validateAssemblyAiToken('sk_live_secret')).toThrow(/temporary token/i)
   })
+
+  it('rejects strings shaped like a raw 32-character hex AssemblyAI API key', () => {
+    expect(() => validateAssemblyAiToken('a'.repeat(32))).toThrow(/temporary token/i)
+    expect(() => validateAssemblyAiToken('0123456789abcdef0123456789abcdef')).toThrow(/temporary token/i)
+  })
 })
 
 describe('AssemblyAI turn event mapping', () => {

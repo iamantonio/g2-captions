@@ -5,19 +5,41 @@ import { getTokenBrokerBindHost, getTokenBrokerCorsOrigin, isAllowedTokenBrokerO
 import { buildDeepgramProxyHeaders, buildDeepgramProxyUpstreamUrl } from '../src/asr/DeepgramProxy'
 import { createDeepgramToken, readDeepgramApiKeyFromEnv } from '../src/asr/DeepgramTokenBroker'
 
-const port = Number.parseInt(process.env.ASSEMBLYAI_TOKEN_BROKER_PORT ?? '8787', 10)
+const REQUEST_BODY_BYTE_CAP = 10_000
+// ~1 MB of pending audio ≈ 30 seconds at 16 kHz / 16-bit / mono. Beyond this
+// we close the browser-side socket rather than buffer indefinitely.
+const PROXY_PENDING_BUFFER_BYTE_CAP = 1_000_000
+
+function parseBrokerPort(raw: string | undefined): number {
+  const fallback = 8787
+  if (raw === undefined) return fallback
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed >= 65536) {
+    throw new Error(
+      `ASSEMBLYAI_TOKEN_BROKER_PORT must be an integer in 1..65535 (got ${JSON.stringify(raw)})`,
+    )
+  }
+  return parsed
+}
+
+const port = parseBrokerPort(process.env.ASSEMBLYAI_TOKEN_BROKER_PORT)
 const host = getTokenBrokerBindHost(process.env)
 const deepgramApiKey = readDeepgramApiKeyFromEnv(process.env)
 const assemblyAiApiKey = process.env.ASSEMBLYAI_API_KEY?.trim()
 const clientLogs: unknown[] = []
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
-  let body = ''
+  const chunks: Buffer[] = []
+  let totalLength = 0
   for await (const chunk of request) {
-    body += String(chunk)
-    if (body.length > 10_000) break
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array)
+    chunks.push(buf)
+    totalLength += buf.length
+    if (totalLength > REQUEST_BODY_BYTE_CAP) break
   }
-  return body ? JSON.parse(body) : {}
+  if (totalLength === 0) return {}
+  const body = Buffer.concat(chunks, Math.min(totalLength, REQUEST_BODY_BYTE_CAP)).toString('utf8')
+  return JSON.parse(body)
 }
 
 const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
@@ -117,10 +139,17 @@ server.on('upgrade', (request, socket, head) => {
   })
 })
 
+function rawDataByteLength(data: RawData): number {
+  if (data instanceof ArrayBuffer) return data.byteLength
+  if (Array.isArray(data)) return data.reduce((total, chunk) => total + chunk.length, 0)
+  return (data as Buffer).length
+}
+
 deepgramProxyServer.on('connection', (browserSocket, request) => {
   const upstreamUrl = buildDeepgramProxyUpstreamUrl(request.url ?? '/deepgram/listen')
   const upstreamSocket = new WebSocket(upstreamUrl, { headers: buildDeepgramProxyHeaders(deepgramApiKey) })
   const pendingBrowserMessages: Array<{ data: RawData; isBinary: boolean }> = []
+  let pendingBytes = 0
   let closing = false
 
   const closeBoth = (code = 1000, reason = '') => {
@@ -138,6 +167,7 @@ deepgramProxyServer.on('connection', (browserSocket, request) => {
     for (const message of pendingBrowserMessages.splice(0)) {
       upstreamSocket.send(message.data, { binary: message.isBinary })
     }
+    pendingBytes = 0
   })
 
   browserSocket.on('message', (data, isBinary) => {
@@ -146,7 +176,13 @@ deepgramProxyServer.on('connection', (browserSocket, request) => {
       return
     }
     if (upstreamSocket.readyState === WebSocket.CONNECTING) {
+      const dataLen = rawDataByteLength(data)
+      if (pendingBytes + dataLen > PROXY_PENDING_BUFFER_BYTE_CAP) {
+        closeBoth(1011, 'Deepgram upstream too slow')
+        return
+      }
       pendingBrowserMessages.push({ data, isBinary })
+      pendingBytes += dataLen
       return
     }
     browserSocket.close(1011, 'Deepgram upstream unavailable')

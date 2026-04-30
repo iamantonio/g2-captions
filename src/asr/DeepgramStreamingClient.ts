@@ -47,9 +47,13 @@ export interface DeepgramMapContext {
   fallbackStartMs: number
 }
 
+// Deepgram raw API keys are 40-character hex (and never sent to the WebView).
+// Reject anything that matches that shape to catch a pasted key.
+const DEEPGRAM_API_KEY_SHAPE = /^[a-f0-9]{40}$/i
+
 export function validateDeepgramAccessToken(token: string): string {
   const trimmed = token.trim()
-  if (!trimmed || trimmed === '***') {
+  if (!trimmed || trimmed === '***' || DEEPGRAM_API_KEY_SHAPE.test(trimmed)) {
     throw new Error('Deepgram streaming requires a temporary token; never embed an API key in the WebView')
   }
   return trimmed
