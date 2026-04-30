@@ -2,6 +2,7 @@
   "name": "g2-captions",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -10,7 +11,8 @@
     "prototype": "tsx tools/run-fixture-prototype.ts",
     "benchmark:fixtures": "tsx tools/run-fixture-benchmark.ts",
     "hardware:readiness": "tsx tools/run-hardware-readiness.ts",
-    "token-broker": "tsx tools/assemblyai-token-broker.ts"
+    "token-broker": "tsx tools/assemblyai-token-broker.ts",
+    "clean": "rm -rf dist artifacts coverage && rm -f *.ehpk"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.10",

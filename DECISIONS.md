@@ -100,3 +100,14 @@ Vendor facts used for this step:
 - AssemblyAI Universal-Streaming uses WebSocket endpoint `wss://streaming.assemblyai.com/v3/ws` and can authenticate with a temporary `token` query parameter instead of an API key header. Source: https://assemblyai.com/docs/api-reference/streaming-api/universal-streaming/universal-streaming
 - Temporary tokens are generated server-side from `/v3/token`, are one-time use, and `expires_in_seconds` must be 1-600 seconds. Source: https://assemblyai.com/docs/streaming/authenticate-with-a-temporary-token
 - Universal-3 Pro Streaming model identifier is `u3-rt-pro`; sessions are billed by open WebSocket session duration, so clients must send `{"type":"Terminate"}` when finished. Source: https://assemblyai.com/docs/streaming/universal-3-pro
+
+### D-0007 — Even Hub SDK dependency pinning policy
+
+Status: Approved by Tony, 2026-04-30
+Decision: **`@evenrealities/even_hub_sdk` stays pinned at `^0.0.10`. Upgrades require manual review and a successful hardware smoke before merging.**
+
+Rationale:
+
+- `@evenrealities/even_hub_sdk` is pre-1.0; npm semver treats `^0.0.x` as exact, so no automatic minor/patch updates flow in. Dependabot is configured to surface new releases as PRs (D-4 fix), but each one needs human review.
+- The SDK is the only sanctioned BLE write path (D-0003) and a behavioral change in the bridge contract can break captioning silently. Any new release must pass a hardware smoke (per `docs/11-hardware-smoke.md`) before merge.
+- This decision documents the *intent* behind the existing pin; no code change is required today.
