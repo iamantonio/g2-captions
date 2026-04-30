@@ -30,7 +30,7 @@ describe('runFixturePrototype', () => {
       ],
     })
 
-    expect(result.frame.text).toContain('A: ProvenMachine is ready')
+    expect(result.frame.text).toContain('[S1] ProvenMachine is ready')
     expect(result.frame.text).toContain('G2')
     expect(result.corrections).toEqual([
       { from: 'proven machine', to: 'ProvenMachine', category: 'company' },

@@ -13,10 +13,12 @@
     "token-broker": "tsx tools/assemblyai-token-broker.ts"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "^0.0.10"
+    "@evenrealities/even_hub_sdk": "^0.0.10",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vite": "^6.3.4",

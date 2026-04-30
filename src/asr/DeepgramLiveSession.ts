@@ -2,14 +2,16 @@ import type { PcmChunk } from '../audio/pcmFixture'
 import type { BenchmarkTelemetryDetails, BenchmarkTelemetryStage } from '../captions/latency'
 import type { RawAsrEvent } from '../types'
 import {
-  buildAssemblyAiStreamingUrl,
-  buildAssemblyAiTerminateMessage,
-  mapAssemblyAiTurnToRawAsrEvent,
-  type AssemblyAiTurnEvent,
-} from './AssemblyAiStreamingClient'
+  buildDeepgramCloseStreamMessage,
+  buildDeepgramStreamingUrl,
+  mapDeepgramResultsToRawAsrEvent,
+  validateDeepgramAccessToken,
+  type DeepgramResultsEvent,
+} from './DeepgramStreamingClient'
 
-export interface AssemblyAiLiveSessionOptions {
-  tokenEndpoint: string
+export interface DeepgramLiveSessionOptions {
+  tokenEndpoint?: string
+  streamingEndpoint?: string
   fetchImpl?: typeof fetch
   WebSocketCtor?: typeof WebSocket
   nowMs?: () => number
@@ -17,16 +19,15 @@ export interface AssemblyAiLiveSessionOptions {
   onVisualStatus: (message: string) => void
   onTelemetry?: (stage: BenchmarkTelemetryStage, details?: BenchmarkTelemetryDetails) => void
   keyterms?: string[]
-  maxSpeakers?: number
   sleep?: (ms: number) => Promise<void>
 }
 
 interface TokenBrokerResponse {
-  token?: unknown
+  accessToken?: unknown
   expiresInSeconds?: unknown
 }
 
-export class AssemblyAiLiveSession {
+export class DeepgramLiveSession {
   private socket: WebSocket | undefined
   private closeStatus = 'ASR CLOSED — captions paused'
   private readonly fetchImpl: typeof fetch
@@ -34,7 +35,7 @@ export class AssemblyAiLiveSession {
   private readonly nowMs: () => number
   private readonly sleep: (ms: number) => Promise<void>
 
-  constructor(private readonly options: AssemblyAiLiveSessionOptions) {
+  constructor(private readonly options: DeepgramLiveSessionOptions) {
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis)
     this.WebSocketCtor = options.WebSocketCtor ?? WebSocket
     this.nowMs = options.nowMs ?? Date.now
@@ -44,20 +45,18 @@ export class AssemblyAiLiveSession {
   async connect(): Promise<void> {
     this.options.onVisualStatus('CONNECTING — token')
     this.markTelemetry('token_request_start')
-    const token = await this.fetchTemporaryToken()
+    const accessToken = this.options.streamingEndpoint ? undefined : await this.fetchTemporaryToken()
     this.markTelemetry('token_request_end')
 
     this.options.onVisualStatus('CONNECTING — ASR')
-    const url = buildAssemblyAiStreamingUrl({
-      token,
-      keyterms: this.options.keyterms,
-      maxSpeakers: this.options.maxSpeakers ?? 2,
-    })
+    const url = buildDeepgramStreamingUrl({ baseUrl: this.options.streamingEndpoint, keyterms: this.options.keyterms })
 
-    this.socket = new this.WebSocketCtor(url.toString())
+    this.socket = accessToken
+      ? new this.WebSocketCtor(url.toString(), ['token', accessToken])
+      : new this.WebSocketCtor(url.toString())
     await new Promise<void>((resolve, reject) => {
       if (!this.socket) {
-        reject(new Error('AssemblyAI WebSocket was not created'))
+        reject(new Error('Deepgram WebSocket was not created'))
         return
       }
       this.socket.onopen = () => {
@@ -68,7 +67,7 @@ export class AssemblyAiLiveSession {
       this.socket.onerror = () => {
         this.markTelemetry('websocket_error')
         this.options.onVisualStatus('ASR CONNECTION FAILED — captions paused')
-        reject(new Error('AssemblyAI WebSocket connection failed'))
+        reject(new Error('Deepgram WebSocket connection failed'))
       }
       this.socket.onclose = () => {
         this.markTelemetry('websocket_closed')
@@ -82,7 +81,7 @@ export class AssemblyAiLiveSession {
     const openState = this.WebSocketCtor.OPEN ?? 1
     if (!this.socket || this.socket.readyState !== openState) {
       this.options.onVisualStatus('AUDIO STREAM FAILED — ASR not connected')
-      throw new Error('AssemblyAI WebSocket is not connected')
+      throw new Error('Deepgram WebSocket is not connected')
     }
 
     this.options.onVisualStatus('AUDIO FIXTURE STREAMING')
@@ -100,7 +99,7 @@ export class AssemblyAiLiveSession {
     const openState = this.WebSocketCtor.OPEN ?? 1
     if (!this.socket || this.socket.readyState !== openState) {
       this.options.onVisualStatus('AUDIO STREAM FAILED — ASR not connected')
-      throw new Error('AssemblyAI WebSocket is not connected')
+      throw new Error('Deepgram WebSocket is not connected')
     }
     this.socket.send(chunk.data)
   }
@@ -109,7 +108,7 @@ export class AssemblyAiLiveSession {
     this.closeStatus = closeStatus
     const openState = this.WebSocketCtor.OPEN ?? 1
     if (this.socket && this.socket.readyState === openState) {
-      this.socket.send(buildAssemblyAiTerminateMessage())
+      this.socket.send(buildDeepgramCloseStreamMessage())
       this.markTelemetry('provider_terminate_sent')
       this.socket = undefined
       return
@@ -119,44 +118,48 @@ export class AssemblyAiLiveSession {
   }
 
   private async fetchTemporaryToken(): Promise<string> {
+    if (!this.options.tokenEndpoint) {
+      this.options.onVisualStatus('ASR TOKEN FAILED — check broker')
+      throw new Error('Deepgram token endpoint is required when no streaming proxy endpoint is configured')
+    }
+
     let response: Response
     try {
       response = await this.fetchImpl(this.options.tokenEndpoint, { method: 'POST' })
-    } catch (error) {
+    } catch {
       this.options.onVisualStatus('ASR TOKEN FAILED — check broker')
-      throw new Error('AssemblyAI token request failed')
+      throw new Error('Deepgram token request failed')
     }
 
     if (!response.ok) {
       this.options.onVisualStatus('ASR TOKEN FAILED — check broker')
-      throw new Error(`AssemblyAI token request failed with HTTP ${response.status}`)
+      throw new Error(`Deepgram token request failed with HTTP ${response.status}`)
     }
 
     const payload = (await response.json()) as TokenBrokerResponse
-    if (typeof payload.token !== 'string' || !payload.token.trim()) {
+    if (typeof payload.accessToken !== 'string' || !payload.accessToken.trim()) {
       this.options.onVisualStatus('ASR TOKEN FAILED — check broker')
-      throw new Error('AssemblyAI token broker returned no temporary token')
+      throw new Error('Deepgram token broker returned no temporary token')
     }
 
-    return payload.token
+    return validateDeepgramAccessToken(payload.accessToken)
   }
 
   private handleMessage(event: MessageEvent): void {
     try {
-      const payload = JSON.parse(String(event.data)) as AssemblyAiTurnEvent
-      if (payload.type !== 'Turn') return
-      const telemetryDetails: BenchmarkTelemetryDetails = { transcript: String(payload.transcript ?? '') }
-      if (typeof payload.speaker_label === 'string' && payload.speaker_label.trim()) {
-        telemetryDetails.speaker = payload.speaker_label
-      }
-      this.markTelemetry(payload.end_of_turn ? 'final_transcript_received' : 'first_partial_received', telemetryDetails)
-      this.options.onTranscript(
-        mapAssemblyAiTurnToRawAsrEvent(payload, {
-          receivedAtMs: this.nowMs(),
-          fallbackStartMs: this.nowMs(),
-        }),
-      )
-    } catch (error) {
+      const payload = JSON.parse(String(event.data)) as DeepgramResultsEvent
+      if (payload.type !== 'Results') return
+      const transcript = String(payload.channel?.alternatives?.[0]?.transcript ?? '')
+      if (!transcript.trim()) return
+      const mapped = mapDeepgramResultsToRawAsrEvent(payload, {
+        receivedAtMs: this.nowMs(),
+        fallbackStartMs: this.nowMs(),
+      })
+      const telemetryDetails: BenchmarkTelemetryDetails = { transcript: mapped.text }
+      if (mapped.speaker && mapped.speaker !== '?') telemetryDetails.speaker = mapped.speaker
+      this.markTelemetry(mapped.status === 'final' ? 'final_transcript_received' : 'first_partial_received', telemetryDetails)
+      this.options.onTranscript(mapped)
+    } catch {
       this.options.onVisualStatus('ASR MESSAGE FAILED — captions paused')
     }
   }

@@ -9,8 +9,8 @@
   "permissions": [
     {
       "name": "network",
-      "desc": "Connects to AssemblyAI Streaming Speech-to-Text for approved live caption benchmark sessions.",
-      "whitelist": ["https://streaming.assemblyai.com"]
+      "desc": "Connects to Deepgram Streaming Speech-to-Text for approved live caption benchmark sessions.",
+      "whitelist": ["https://api.deepgram.com"]
     }
   ],
   "supported_languages": ["en"]

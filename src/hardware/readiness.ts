@@ -26,7 +26,7 @@ export function buildHardwareSmokeUrls(lanIp: string): HardwareSmokeUrls {
   return {
     lanIp,
     viteUrl,
-    tokenBrokerUrl: `http://${lanIp}:8787/assemblyai/token`,
+    tokenBrokerUrl: `http://${lanIp}:8787/deepgram/token`,
     qrCommand: `evenhub qr --url "${viteUrl}"`,
   }
 }
@@ -47,7 +47,7 @@ export function buildHardwareReadinessChecklist(lanIp: string): HardwareReadines
     probes: [
       `curl -I --max-time 5 "${urls.viteUrl}/"`,
       `curl -i --max-time 10 -X OPTIONS -H "Origin: ${urls.viteUrl}" "${urls.tokenBrokerUrl}"`,
-      `curl -sS --max-time 15 -X POST -H "Origin: ${urls.viteUrl}" "${urls.tokenBrokerUrl}" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const j=JSON.parse(s); console.log('token_present=', typeof j.token === 'string' && j.token.length > 10); console.log('expiresInSeconds=', j.expiresInSeconds);})"`,
+      `curl -sS --max-time 15 -X POST -H "Origin: ${urls.viteUrl}" "${urls.tokenBrokerUrl}" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const j=JSON.parse(s); console.log('token_present=', typeof j.accessToken === 'string' && j.accessToken.length > 10); console.log('expiresInSeconds=', j.expiresInSeconds);})"`,
     ],
     requiredVisualStates: [
       'HARDWARE SMOKE — connecting ASR',
@@ -88,7 +88,7 @@ export function formatHardwareReadinessReport(checklist: HardwareReadinessCheckl
     '## Probes',
     ...checklist.probes.map((probe) => `- \`${probe}\``),
     '',
-    'Probe note: token sanity checks should print `token_present= true` and never print raw token values or ASSEMBLYAI_API_KEY.',
+    'Probe note: token sanity checks should print `token_present= true` and never print raw token values or DEEPGRAM_API_KEY.',
     '',
     '## Required visual states',
     ...checklist.requiredVisualStates.map((state) => `- ${state}`),

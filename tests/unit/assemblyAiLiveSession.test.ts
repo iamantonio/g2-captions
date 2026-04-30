@@ -70,6 +70,29 @@ describe('AssemblyAiLiveSession', () => {
     expect(FakeWebSocket.instances[0].sent).toEqual([buildAssemblyAiTerminateMessage()])
   })
 
+  it('renders an intentional close status for fixture smoke completion', async () => {
+    FakeWebSocket.instances = []
+    const onVisualStatus = vi.fn()
+    const session = new AssemblyAiLiveSession({
+      tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
+      fetchImpl: vi.fn(async () =>
+        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onTranscript: vi.fn(),
+      onVisualStatus,
+    })
+
+    await session.connect()
+    session.terminate('SMOKE COMPLETE — captions verified')
+    FakeWebSocket.instances[0].onclose?.(new CloseEvent('close'))
+
+    expect(onVisualStatus).toHaveBeenCalledWith('SMOKE COMPLETE — captions verified')
+  })
+
   it('renders token failures visually and never opens a WebSocket', async () => {
     FakeWebSocket.instances = []
     const onVisualStatus = vi.fn()

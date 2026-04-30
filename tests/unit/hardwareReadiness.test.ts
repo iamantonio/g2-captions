@@ -11,7 +11,7 @@ describe('hardware readiness helpers', () => {
     const urls = buildHardwareSmokeUrls('192.168.1.42')
 
     expect(urls.viteUrl).toBe('http://192.168.1.42:5173')
-    expect(urls.tokenBrokerUrl).toBe('http://192.168.1.42:8787/assemblyai/token')
+    expect(urls.tokenBrokerUrl).toBe('http://192.168.1.42:8787/deepgram/token')
     expect(urls.qrCommand).toBe('evenhub qr --url "http://192.168.1.42:5173"')
   })
 
