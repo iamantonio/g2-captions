@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   GestureController,
   TAP_EVENT_TYPES,
-  WEARABLE_INPUT_SOURCES,
   type GestureBridge,
   type GestureBridgeEvent,
 } from '../../src/app/GestureController'
@@ -39,10 +38,6 @@ function makeLogger(): ClientLogger & {
   return { stage: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }
 
-const RING_SOURCE = 2
-const GLASSES_RIGHT_SOURCE = 1
-const GLASSES_LEFT_SOURCE = 3
-
 describe('GestureController', () => {
   it('subscribes to bridge events on construction and unsubscribes on dispose()', () => {
     const bridge = makeFakeBridge()
@@ -57,58 +52,51 @@ describe('GestureController', () => {
     expect(bridge.unsubscribed).toBe(true)
   })
 
-  it('routes ring CLICK_EVENT to onSingleTap with source=ring', () => {
+  it('routes textEvent CLICK_EVENT to onSingleTap (the path used when the lens caption container is the focused capture target)', () => {
     const bridge = makeFakeBridge()
     const onSingleTap = vi.fn()
     new GestureController({ bridge, logger: makeLogger(), onSingleTap, onDoubleTap: vi.fn() })
 
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: RING_SOURCE } })
-    expect(onSingleTap).toHaveBeenCalledWith('ring')
+    bridge.emit({ textEvent: { eventType: TAP_EVENT_TYPES.click, containerID: 1 } })
+    expect(onSingleTap).toHaveBeenCalledWith('capture-target')
   })
 
-  it('routes ring DOUBLE_CLICK_EVENT to onDoubleTap', () => {
+  it('routes textEvent DOUBLE_CLICK_EVENT to onDoubleTap', () => {
     const bridge = makeFakeBridge()
     const onDoubleTap = vi.fn()
     new GestureController({ bridge, logger: makeLogger(), onSingleTap: vi.fn(), onDoubleTap })
 
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.doubleClick, eventSource: RING_SOURCE } })
-    expect(onDoubleTap).toHaveBeenCalledWith('ring')
+    bridge.emit({ textEvent: { eventType: TAP_EVENT_TYPES.doubleClick, containerID: 1 } })
+    expect(onDoubleTap).toHaveBeenCalledWith('capture-target')
   })
 
-  it('treats both glasses temples as wearable input alongside the ring', () => {
+  it('routes listEvent CLICK_EVENT the same way (in case a future surface adds a list container)', () => {
     const bridge = makeFakeBridge()
     const onSingleTap = vi.fn()
     new GestureController({ bridge, logger: makeLogger(), onSingleTap, onDoubleTap: vi.fn() })
 
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: GLASSES_RIGHT_SOURCE } })
+    bridge.emit({ listEvent: { eventType: TAP_EVENT_TYPES.click, containerID: 2 } })
+    expect(onSingleTap).toHaveBeenCalledWith('capture-target')
+  })
+
+  it('reports source = ring when the SDK includes sysEvent.eventSource (system-level path)', () => {
+    const bridge = makeFakeBridge()
+    const onSingleTap = vi.fn()
+    new GestureController({ bridge, logger: makeLogger(), onSingleTap, onDoubleTap: vi.fn() })
+
+    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: 2 } }) // RING
+    expect(onSingleTap).toHaveBeenCalledWith('ring')
+  })
+
+  it('reports source = glasses-right / glasses-left from sysEvent.eventSource', () => {
+    const bridge = makeFakeBridge()
+    const onSingleTap = vi.fn()
+    new GestureController({ bridge, logger: makeLogger(), onSingleTap, onDoubleTap: vi.fn() })
+
+    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: 1 } }) // GLASSES_R
     expect(onSingleTap).toHaveBeenCalledWith('glasses-right')
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: GLASSES_LEFT_SOURCE } })
+    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: 3 } }) // GLASSES_L
     expect(onSingleTap).toHaveBeenCalledWith('glasses-left')
-    expect(onSingleTap).toHaveBeenCalledTimes(2)
-  })
-
-  it('ignores events whose eventSource is not a wearable input', () => {
-    const bridge = makeFakeBridge()
-    const onSingleTap = vi.fn()
-    new GestureController({ bridge, logger: makeLogger(), onSingleTap, onDoubleTap: vi.fn() })
-
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: 0 } }) // DUMMY_NULL
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: 99 } }) // unknown
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click } }) // missing source
-    expect(onSingleTap).not.toHaveBeenCalled()
-  })
-
-  it('ignores non-tap event types like FOREGROUND_ENTER and IMU_DATA_REPORT', () => {
-    const bridge = makeFakeBridge()
-    const onSingleTap = vi.fn()
-    const onDoubleTap = vi.fn()
-    new GestureController({ bridge, logger: makeLogger(), onSingleTap, onDoubleTap })
-
-    bridge.emit({ sysEvent: { eventType: 4, eventSource: RING_SOURCE } }) // FOREGROUND_ENTER
-    bridge.emit({ sysEvent: { eventType: 5, eventSource: RING_SOURCE } }) // FOREGROUND_EXIT
-    bridge.emit({ sysEvent: { eventType: 8, eventSource: RING_SOURCE } }) // IMU_DATA_REPORT
-    expect(onSingleTap).not.toHaveBeenCalled()
-    expect(onDoubleTap).not.toHaveBeenCalled()
   })
 
   it('routes scroll gestures only when handlers are provided', () => {
@@ -124,10 +112,10 @@ describe('GestureController', () => {
       onScrollDown,
     })
 
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.scrollTop, eventSource: RING_SOURCE } })
-    expect(onScrollUp).toHaveBeenCalledWith('ring')
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.scrollBottom, eventSource: RING_SOURCE } })
-    expect(onScrollDown).toHaveBeenCalledWith('ring')
+    bridge.emit({ textEvent: { eventType: TAP_EVENT_TYPES.scrollTop, containerID: 1 } })
+    expect(onScrollUp).toHaveBeenCalledWith('capture-target')
+    bridge.emit({ textEvent: { eventType: TAP_EVENT_TYPES.scrollBottom, containerID: 1 } })
+    expect(onScrollDown).toHaveBeenCalledWith('capture-target')
   })
 
   it('drops scroll events safely when no scroll handler is wired (Phase 1 default)', () => {
@@ -138,23 +126,44 @@ describe('GestureController', () => {
       onSingleTap: vi.fn(),
       onDoubleTap: vi.fn(),
     })
-    expect(() =>
-      bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.scrollTop, eventSource: RING_SOURCE } }),
-    ).not.toThrow()
+    expect(() => bridge.emit({ textEvent: { eventType: TAP_EVENT_TYPES.scrollTop, containerID: 1 } })).not.toThrow()
   })
 
-  it('logs every dispatched gesture with source label so hardware-smoke logs can verify ring usage', () => {
+  it('ignores audio-only events (those have no textEvent / listEvent / sysEvent)', () => {
+    const bridge = makeFakeBridge()
+    const onSingleTap = vi.fn()
+    new GestureController({ bridge, logger: makeLogger(), onSingleTap, onDoubleTap: vi.fn() })
+
+    bridge.emit({}) // empty payload
+    expect(onSingleTap).not.toHaveBeenCalled()
+  })
+
+  it('logs a raw_event line for every text/list/sys event so hardware-smoke logs reveal the shape the SDK actually emits', () => {
     const bridge = makeFakeBridge()
     const logger = makeLogger()
     new GestureController({ bridge, logger, onSingleTap: vi.fn(), onDoubleTap: vi.fn() })
-    bridge.emit({ sysEvent: { eventType: TAP_EVENT_TYPES.click, eventSource: RING_SOURCE } })
-    expect(logger.stage).toHaveBeenCalledWith('gesture_single_tap', { source: 'ring' })
+
+    bridge.emit({ textEvent: { eventType: TAP_EVENT_TYPES.click, containerID: 1, containerName: 'g2-caption-main' } })
+    expect(logger.stage).toHaveBeenCalledWith(
+      'gesture_raw_event',
+      expect.objectContaining({
+        kind: 'text',
+        textEventType: 0,
+        textContainerID: 1,
+      }),
+    )
   })
 
-  it('exports the wearable-source allowlist as a Set for external introspection', () => {
-    expect(WEARABLE_INPUT_SOURCES.has(1)).toBe(true)
-    expect(WEARABLE_INPUT_SOURCES.has(2)).toBe(true)
-    expect(WEARABLE_INPUT_SOURCES.has(3)).toBe(true)
-    expect(WEARABLE_INPUT_SOURCES.has(0)).toBe(false)
+  it('logs unrecognized event types so we can see what the SDK sends besides click/double-click/scroll', () => {
+    const bridge = makeFakeBridge()
+    const logger = makeLogger()
+    new GestureController({ bridge, logger, onSingleTap: vi.fn(), onDoubleTap: vi.fn() })
+
+    // OsEventTypeList: 4=FOREGROUND_ENTER, 5=FOREGROUND_EXIT, 8=IMU_DATA_REPORT
+    bridge.emit({ sysEvent: { eventType: 8, eventSource: 2 } })
+    expect(logger.stage).toHaveBeenCalledWith(
+      'gesture_event_type_unrecognized',
+      expect.objectContaining({ eventType: 8, source: 'ring' }),
+    )
   })
 })

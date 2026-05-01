@@ -22,6 +22,13 @@ export interface ClientLogger {
 export interface CreateClientLoggerOptions {
   endpoint: string
   href: string
+  /**
+   * Pre-shared bearer token for the production broker. When set, every
+   * /client-log POST sends `Authorization: Bearer <token>`. Without this,
+   * non-loopback brokers reject the POST at their auth gate and we lose
+   * all client-side telemetry.
+   */
+  brokerAuthToken?: string
   consoleImpl?: Pick<Console, 'info' | 'warn' | 'error'>
   fetchImpl?: typeof fetch
 }
@@ -52,9 +59,11 @@ export function createClientLogger(options: CreateClientLoggerOptions): ClientLo
           ? consoleImpl.warn
           : consoleImpl.info
     consoleMethod.call(consoleImpl, `[g2-captions] ${stage}`, entry)
+    const headers: Record<string, string> = { 'content-type': 'application/json' }
+    if (options.brokerAuthToken) headers.authorization = `Bearer ${options.brokerAuthToken}`
     void fetchImpl(options.endpoint, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers,
       body: JSON.stringify(entry),
     }).catch(() => undefined)
   }

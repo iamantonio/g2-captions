@@ -28,6 +28,7 @@ const locationUrl = new URL(window.location.href)
 const logger = createClientLogger({
   endpoint: getClientLogEndpoint(locationUrl),
   href: window.location.href,
+  brokerAuthToken: getBrokerAuthToken(),
 })
 const telemetry = new TelemetryReporter({ provider: 'deepgram' })
 let g2AudioBridge: G2AudioBridge | undefined
