@@ -9,8 +9,12 @@
   "permissions": [
     {
       "name": "network",
-      "desc": "Connects to Deepgram Streaming Speech-to-Text for approved live caption benchmark sessions.",
-      "whitelist": ["https://api.deepgram.com"]
+      "desc": "Connects to the deployed g2-captions broker (which proxies Deepgram Streaming Speech-to-Text) for approved live caption sessions.",
+      "whitelist": [
+        "https://api.deepgram.com",
+        "https://g2-captions-broker.fly.dev",
+        "wss://g2-captions-broker.fly.dev"
+      ]
     }
   ],
   "supported_languages": ["en"]

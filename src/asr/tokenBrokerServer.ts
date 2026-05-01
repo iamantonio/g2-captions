@@ -16,8 +16,30 @@ function isPrivateLanHost(hostname: string): boolean {
   )
 }
 
-export function isAllowedTokenBrokerOrigin(origin: string | undefined): boolean {
+/**
+ * Comma-separated list of additional allowed origins, read from the
+ * `BROKER_ALLOWED_ORIGINS` env var. Used by the production deploy to
+ * allow the Even Hub portal origin (or any other production WebView
+ * host) without a code change. Local-dev behavior is unchanged when
+ * the env var is unset.
+ *
+ * Example: `BROKER_ALLOWED_ORIGINS=https://hub.evenrealities.com,https://g2-captions-broker.fly.dev`
+ */
+export function getExtraAllowedOrigins(env: NodeJS.ProcessEnv = process.env): Set<string> {
+  const raw = env.BROKER_ALLOWED_ORIGINS
+  if (!raw) return new Set()
+  return new Set(
+    raw
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0),
+  )
+}
+
+export function isAllowedTokenBrokerOrigin(origin: string | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
   if (!origin) return true
+
+  if (getExtraAllowedOrigins(env).has(origin)) return true
 
   try {
     const url = new URL(origin)
@@ -27,7 +49,7 @@ export function isAllowedTokenBrokerOrigin(origin: string | undefined): boolean 
   }
 }
 
-export function getTokenBrokerCorsOrigin(origin: string | undefined): string {
-  if (origin && isAllowedTokenBrokerOrigin(origin)) return origin
+export function getTokenBrokerCorsOrigin(origin: string | undefined, env: NodeJS.ProcessEnv = process.env): string {
+  if (origin && isAllowedTokenBrokerOrigin(origin, env)) return origin
   return 'http://127.0.0.1:5173'
 }

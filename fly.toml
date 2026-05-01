@@ -3,7 +3,7 @@
 # and writes back the generated app name. Leave the rest as-is unless you
 # move regions or change the internal port.
 
-# app = "your-broker-app-name"
+app = "g2-captions-broker"
 primary_region = "ord"
 
 [build]
