@@ -5,7 +5,6 @@ import { CaptionState } from '../../src/captions/CaptionState'
 import { TelemetryReporter } from '../../src/app/TelemetryReporter'
 import type { ClientLogger } from '../../src/observability/clientLogger'
 import type { G2DisplayResult, G2LensDisplay } from '../../src/display/g2LensDisplay'
-import type { RawAsrEvent } from '../../src/types'
 
 function makeLogger(): ClientLogger & {
   stage: ReturnType<typeof vi.fn>
@@ -141,14 +140,35 @@ describe('UIShell — production mode (default)', () => {
     const { telemetry, root, shell } = build({ recorderEvents: 1 })
     telemetry.start('test')
     shell.render()
+    // Production mode never mounts the telemetry surface at all.
     expect(root.querySelector('details')).toBeNull()
   })
 
-  it('renders the caption frame in the primary surface', () => {
+  it('shows an empty-state message before any captions arrive', () => {
     const { root, shell } = build()
-    shell.render('READY — starting caption check')
-    const pre = root.querySelector('.g2-shell__frame')
-    expect(pre?.textContent).toContain('G2 CAPTIONS')
+    shell.render()
+    const empty = root.querySelector('.g2-shell__empty') as HTMLElement | null
+    expect(empty).not.toBeNull()
+    expect(empty?.hidden).toBe(false)
+    expect(empty?.querySelector('.g2-shell__empty-heading')?.textContent).toBe('Captions will appear here')
+  })
+
+  it('hides the empty state once a caption row mounts and renders the row text', () => {
+    const { state, root, shell } = build()
+    shell.render()
+    state.applyAsrEvent({
+      vendor: 'deepgram',
+      text: 'hello there',
+      startMs: 0,
+      endMs: 1000,
+      status: 'final',
+      speaker: 'A',
+      receivedAtMs: 1100,
+    })
+    shell.render()
+    const empty = root.querySelector('.g2-shell__empty') as HTMLElement | null
+    expect(empty?.hidden).toBe(true)
+    expect(root.querySelector('.caption-row__text')?.textContent).toBe('hello there')
   })
 })
 
@@ -204,16 +224,21 @@ describe('UIShell — debug mode (?debug=1)', () => {
   })
 
   it('hides the telemetry panel when the recorder has no events, shows it once events exist', () => {
+    // Debug mode mounts a single <details> element and toggles its
+    // `hidden` attribute based on whether the recorder has any events.
     const empty = build({ recorderEvents: 0, debug: true })
     empty.telemetry.start('test')
     empty.shell.render()
-    expect(empty.root.querySelector('details')).toBeNull()
+    const emptyDetails = empty.root.querySelector('details') as HTMLDetailsElement | null
+    expect(emptyDetails).not.toBeNull()
+    expect(emptyDetails?.hidden).toBe(true)
 
     const populated = build({ recorderEvents: 1, debug: true })
     populated.telemetry.start('test')
     populated.shell.render()
-    const details = populated.root.querySelector('details')
+    const details = populated.root.querySelector('details') as HTMLDetailsElement | null
     expect(details).not.toBeNull()
+    expect(details?.hidden).toBe(false)
     expect(details?.querySelector('pre')?.getAttribute('aria-label')).toBe('Latest benchmark telemetry JSON')
   })
 
@@ -238,18 +263,37 @@ describe('UIShell — shared behavior across modes', () => {
     expect(shell.getVisualStatus()).toBe('AUDIO FIXTURE STREAMING')
   })
 
-  it('renders a CaptionState change after re-render so transcripts appear in the frame', () => {
-    const { state, root, shell } = build()
-    shell.render()
-    state.applyAsrEvent({
+  it('renders a CaptionState change after re-render so transcripts appear in the surface', () => {
+    // Production mode renders captions as `.caption-row__text` rows
+    // (mutated incrementally), not as a single <pre> frame text. Test
+    // both modes by checking the expected per-mode location.
+    const prod = build()
+    prod.shell.render()
+    prod.state.applyAsrEvent({
+      vendor: 'deepgram',
       text: 'hello there',
       startMs: 0,
       endMs: 1000,
       status: 'final',
       speaker: 'A',
-    } as RawAsrEvent)
-    shell.render()
-    expect(root.querySelector('pre')?.textContent).toContain('hello there')
+      receivedAtMs: 1100,
+    })
+    prod.shell.render()
+    expect(prod.root.querySelector('.caption-row__text')?.textContent).toBe('hello there')
+
+    const dbg = build({ debug: true })
+    dbg.shell.render()
+    dbg.state.applyAsrEvent({
+      vendor: 'deepgram',
+      text: 'hello there',
+      startMs: 0,
+      endMs: 1000,
+      status: 'final',
+      speaker: 'A',
+      receivedAtMs: 1100,
+    })
+    dbg.shell.render()
+    expect(dbg.root.querySelector('.g2-shell__frame')?.textContent).toContain('hello there')
   })
 
   it('updates lastFrameText to match the rendered text so the lens forwarder can replay it', () => {
@@ -265,6 +309,52 @@ describe('UIShell — shared behavior across modes', () => {
     shell.attachG2Display(display)
     await shell.renderLens('frame text')
     expect(render).toHaveBeenCalledWith('frame text')
+  })
+
+  it('skips identical lens renders to avoid wasted BLE writes', async () => {
+    const render = vi.fn(async (): Promise<G2DisplayResult> => ({ ok: true }))
+    const display = { render } as unknown as G2LensDisplay
+    const { shell } = build()
+    shell.attachG2Display(display)
+    await shell.renderLens('same text')
+    await shell.renderLens('same text')
+    await shell.renderLens('same text')
+    expect(render).toHaveBeenCalledTimes(1)
+    await shell.renderLens('different text')
+    expect(render).toHaveBeenCalledTimes(2)
+  })
+
+  it('after a lens render failure, the next render is allowed through (no permanent dedupe lock)', async () => {
+    const render = vi
+      .fn(async (): Promise<G2DisplayResult> => ({ ok: true }))
+      .mockResolvedValueOnce({ ok: false, visualStatus: 'G2 DISPLAY FAILED — startup rejected' })
+    const display = { render } as unknown as G2LensDisplay
+    const { shell } = build()
+    shell.attachG2Display(display)
+    await shell.renderLens('first')
+    await shell.renderLens('first') // would normally dedupe — but the failure cleared lastLensText
+    expect(render).toHaveBeenCalledTimes(2)
+  })
+
+  it('mount-once: status pill DOM node is preserved across renders so CSS transitions can fire', () => {
+    const { root, shell } = build()
+    shell.render('READY — starting caption check')
+    const pillBefore = root.querySelector('.g2-shell__status')
+    shell.render('CONNECTING — token')
+    const pillAfter = root.querySelector('.g2-shell__status')
+    expect(pillBefore).toBe(pillAfter)
+    expect(pillAfter?.classList.contains('g2-shell__status--connecting')).toBe(true)
+    expect(pillAfter?.textContent).toBe('Connecting…')
+  })
+
+  it('mount-once: primary button DOM node is preserved across renders', () => {
+    const { root, shell } = build()
+    shell.render()
+    const buttonBefore = root.querySelector('.g2-shell__primary')
+    shell.render('G2 MIC LIVE — captions streaming')
+    const buttonAfter = root.querySelector('.g2-shell__primary')
+    expect(buttonBefore).toBe(buttonAfter)
+    expect(buttonAfter?.textContent).toBe('Stop captions')
   })
 
   it('renderLens surfaces a failure as an inline aria role=status warning (deaf-first)', async () => {

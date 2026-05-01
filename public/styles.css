@@ -110,6 +110,22 @@ body {
   border-color: rgba(46, 204, 113, 0.4);
 }
 
+.g2-shell__status--live::before {
+  animation: status-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
 .g2-shell__status--stopped {
   color: var(--g2-text-muted);
   border-color: var(--g2-border);
@@ -118,11 +134,14 @@ body {
 .g2-shell__captions {
   flex: 1;
   display: flex;
+  flex-direction: column;
   background: var(--g2-surface);
   border: 1px solid var(--g2-border);
   border-radius: var(--g2-radius);
   padding: 20px;
-  min-height: 200px;
+  min-height: 220px;
+  overflow: hidden;
+  position: relative;
 }
 
 .g2-shell__frame {
@@ -134,6 +153,156 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--g2-text);
+}
+
+/* Empty-state copy shown before any captions arrive. Hidden once the
+ * first caption row mounts; CaptionView toggles `hidden` on the element. */
+.g2-shell__empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  height: 100%;
+  min-height: 180px;
+  gap: 6px;
+  color: var(--g2-text-muted);
+}
+
+.g2-shell__empty[hidden] {
+  display: none;
+}
+
+.g2-shell__empty-heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--g2-text);
+}
+
+.g2-shell__empty-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+/* Caption rows — incremental updates from CaptionView. The list is
+ * scrollable when more rows accumulate than fit in the surface; the
+ * latest row is auto-anchored to the bottom by `flex-direction: column`
+ * + `justify-content: flex-end`. */
+.caption-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+.caption-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  /* New rows fade in once on mount; subsequent text mutations transition
+   * via the rules on .caption-row__text below (no animation re-trigger). */
+  animation: caption-row-enter 220ms ease-out;
+}
+
+@keyframes caption-row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.caption-row__speaker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #001830;
+  background: var(--g2-accent);
+  margin-top: 2px;
+  /* Per-speaker chip color is set by `.speaker-…` modifier classes below. */
+}
+
+.caption-row__text {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--g2-text);
+  /* Small color/opacity transition lets partial→final feel smooth.
+   * `text-content` itself can't transition, but on a partial-to-final
+   * status flip the row's class changes which transitions the surrounding
+   * styles. Real word-by-word morphing would need character-level diffing,
+   * but the value-vs-effort isn't there yet. */
+  transition:
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+/* Partials are visually softer to communicate "still settling". When the
+ * status flips to final, the color/opacity restore — a calm in-place
+ * confirmation rather than a flash. */
+.caption-row--partial .caption-row__text {
+  color: var(--g2-text-muted);
+  font-style: italic;
+}
+
+.caption-row--final .caption-row__text {
+  color: var(--g2-text);
+  font-style: normal;
+}
+
+/* Per-speaker chip palette. Numeric Deepgram labels (S1/S2/S3/...) get
+ * deterministic colors so each conversation participant is visually
+ * consistent across a session. Unknown speaker uses a neutral chip. */
+.caption-row__speaker.speaker-n0,
+.caption-row__speaker.speaker-la {
+  background: #4eb8ff;
+  color: #001830;
+}
+.caption-row__speaker.speaker-n1,
+.caption-row__speaker.speaker-lb {
+  background: #ff9f6b;
+  color: #2a1100;
+}
+.caption-row__speaker.speaker-n2,
+.caption-row__speaker.speaker-lc {
+  background: #2ecc71;
+  color: #002a14;
+}
+.caption-row__speaker.speaker-n3,
+.caption-row__speaker.speaker-ld {
+  background: #c084fc;
+  color: #200a30;
+}
+.caption-row__speaker.speaker-n4,
+.caption-row__speaker.speaker-le {
+  background: #f5c542;
+  color: #2c1f00;
+}
+.caption-row__speaker.speaker-unknown {
+  background: var(--g2-border);
+  color: var(--g2-text-muted);
 }
 
 .g2-shell__controls {
