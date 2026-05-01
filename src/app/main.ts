@@ -11,6 +11,7 @@ import { createClientLogger } from '../observability/clientLogger'
 import type { RawAsrEvent } from '../types'
 import { runFixturePrototype } from './runFixturePrototype'
 import {
+  getBrokerAuthToken,
   getClientLogEndpoint,
   getDefaultStreamingEndpoint,
   getDefaultTokenEndpoint,
@@ -176,6 +177,7 @@ async function connectDeepgram(fixtureId = 'speech-smoke'): Promise<void> {
   session = new DeepgramLiveSession({
     tokenEndpoint: getDefaultTokenEndpoint(locationUrl),
     streamingEndpoint: getDefaultStreamingEndpoint(locationUrl),
+    brokerAuthToken: getBrokerAuthToken(),
     keyterms: ['ProvenMachine'],
     onTranscript: (event: RawAsrEvent) => {
       state.applyAsrEvent(event)

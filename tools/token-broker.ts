@@ -45,10 +45,22 @@ function readVersion(): string {
   }
 }
 
+// Bearer auth — matched against import.meta.env.VITE_BROKER_AUTH_TOKEN that
+// Vite injects into the WebView bundle. When unset, the broker only enforces
+// the Origin allowlist (acceptable while the broker is loopback-bound; risky
+// when LAN-bound). Hardware-smoke runs with HOST=0.0.0.0 should set this.
+const brokerAuthToken = process.env.VITE_BROKER_AUTH_TOKEN?.trim()
+if (!brokerAuthToken) {
+  logger.warn(
+    'VITE_BROKER_AUTH_TOKEN is unset; broker is gated only by the Origin allowlist. Set it in .env before LAN-binding.',
+  )
+}
+
 const { server, shutdown } = createTokenBrokerServer({
   logger,
   deepgramApiKey,
   assemblyAiApiKey,
+  brokerAuthToken,
   rateLimiter: { consume: (key) => rateLimiter.consume(key).then(() => undefined) },
   version: readVersion(),
 })

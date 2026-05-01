@@ -30,3 +30,16 @@ export function shouldAutoRunHardwareSmoke(locationUrl: URL, hasEvenBridge: bool
   if (!hasEvenBridge) return false
   return locationUrl.searchParams.get('autoSmoke') === '1'
 }
+
+/**
+ * Reads the broker bearer token from Vite's build-time-injected env. The
+ * broker reads the same VITE_BROKER_AUTH_TOKEN value at boot. Returns
+ * undefined when unset — the broker accepts unauthenticated requests in that
+ * mode (loopback-bound dev). Set it in .env before LAN-binding.
+ */
+export function getBrokerAuthToken(): string | undefined {
+  // Vite replaces import.meta.env.VITE_* at build time; in non-Vite test
+  // environments the property is undefined.
+  const value = import.meta.env?.VITE_BROKER_AUTH_TOKEN
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}

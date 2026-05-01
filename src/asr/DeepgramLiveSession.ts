@@ -24,6 +24,11 @@ export interface DeepgramLiveSessionOptions {
    * Pino on the server side or createClientLogger on the WebView side.
    */
   onError?: (stage: string, err: unknown, details?: Record<string, unknown>) => void
+  /**
+   * Pre-shared bearer token for the local broker. Sent as Authorization
+   * header on the token POST and as ?auth=<token> on the WS upgrade URL.
+   */
+  brokerAuthToken?: string
   keyterms?: string[]
   sleep?: (ms: number) => Promise<void>
 }
@@ -56,6 +61,9 @@ export class DeepgramLiveSession {
 
     this.options.onVisualStatus('CONNECTING — ASR')
     const url = buildDeepgramStreamingUrl({ baseUrl: this.options.streamingEndpoint, keyterms: this.options.keyterms })
+    if (this.options.brokerAuthToken) {
+      url.searchParams.set('auth', this.options.brokerAuthToken)
+    }
 
     this.socket = accessToken
       ? new this.WebSocketCtor(url.toString(), ['token', accessToken])
@@ -130,8 +138,12 @@ export class DeepgramLiveSession {
     }
 
     let response: Response
+    const init: RequestInit = { method: 'POST' }
+    if (this.options.brokerAuthToken) {
+      init.headers = { authorization: `Bearer ${this.options.brokerAuthToken}` }
+    }
     try {
-      response = await this.fetchImpl(this.options.tokenEndpoint, { method: 'POST' })
+      response = await this.fetchImpl(this.options.tokenEndpoint, init)
     } catch (err) {
       this.options.onError?.('asr_token_fetch_failed', err)
       this.options.onVisualStatus('ASR TOKEN FAILED — check broker')

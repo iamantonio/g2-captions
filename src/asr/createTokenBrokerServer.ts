@@ -37,6 +37,39 @@ export interface TokenBrokerDeps {
    * Project version, surfaced via /healthz for hardware-smoke probes.
    */
   version?: string
+  /**
+   * Pre-shared bearer token. When set, every HTTP route except /healthz and
+   * the WS upgrade require Authorization: Bearer <token> (HTTP) or
+   * ?auth=<token> (WS). Loopback (127.0.0.1) requests are exempted so the
+   * local dev loop stays frictionless. Origin gating remains as
+   * defense-in-depth (Fix #35).
+   *
+   * When unset, no bearer auth is enforced and the Origin allowlist is the
+   * only gate — used during initial dev when the LAN bind isn't in play.
+   */
+  brokerAuthToken?: string
+}
+
+function isLoopback(request: IncomingMessage): boolean {
+  const remote = request.socket.remoteAddress ?? ''
+  return remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1'
+}
+
+function bearerFromHeader(request: IncomingMessage): string | undefined {
+  const header = request.headers.authorization
+  if (typeof header !== 'string') return undefined
+  const match = header.trim().match(/^Bearer\s+(.+)$/i)
+  return match ? match[1].trim() : undefined
+}
+
+function bearerFromUpgradeUrl(rawUrl: string | undefined): string | undefined {
+  if (!rawUrl) return undefined
+  try {
+    const url = new URL(rawUrl, 'ws://localhost')
+    return url.searchParams.get('auth') ?? undefined
+  } catch {
+    return undefined
+  }
 }
 
 export interface TokenBrokerHandle {
@@ -114,38 +147,55 @@ function rawDataByteLength(data: RawData): number {
 }
 
 export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandle {
-  const { logger, deepgramApiKey, assemblyAiApiKey, rateLimiter } = deps
+  const { logger, deepgramApiKey, assemblyAiApiKey, rateLimiter, brokerAuthToken } = deps
   const retention = deps.clientLogRetention ?? 200
   const version = deps.version ?? 'unknown'
   const clientLogs: unknown[] = []
   const activeProxyPairs = new Set<{ browser: WebSocket; upstream: WebSocket }>()
 
+  function bearerCheckPasses(request: IncomingMessage, providedToken?: string): boolean {
+    if (!brokerAuthToken) return true
+    if (isLoopback(request)) return true
+    const supplied = providedToken ?? bearerFromHeader(request)
+    return supplied === brokerAuthToken
+  }
+
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
     const origin = request.headers.origin
     response.setHeader('Access-Control-Allow-Origin', getTokenBrokerCorsOrigin(origin))
     response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    response.setHeader('Access-Control-Allow-Headers', 'content-type')
+    response.setHeader('Access-Control-Allow-Headers', 'authorization, content-type')
     response.setHeader('Vary', 'Origin')
     response.setHeader('Cache-Control', 'no-store')
 
-    // /healthz is intentionally exempt from origin gating so external probes
-    // (curl, hardware-readiness script) can check liveness without faking a
-    // browser Origin header.
+    // /healthz is intentionally exempt from origin gating AND bearer-auth so
+    // external probes (curl, hardware-readiness script) can check liveness
+    // without faking a browser Origin or knowing the broker auth token.
     if (request.method === 'GET' && request.url === '/healthz') {
       response.writeHead(200, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ ok: true, version }))
       return
     }
 
+    // Origin filter — defense-in-depth for browser callers (Fix #35).
     if (!isAllowedTokenBrokerOrigin(origin)) {
       response.writeHead(403, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ error: 'origin_not_allowed' }))
       return
     }
 
+    // OPTIONS preflight is allowed without bearer (browsers send these without
+    // any auth headers per the CORS spec).
     if (request.method === 'OPTIONS') {
       response.writeHead(204)
       response.end()
+      return
+    }
+
+    // Bearer-token gate (Fix #34). Authoritative for non-loopback callers.
+    if (!bearerCheckPasses(request)) {
+      response.writeHead(401, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ error: 'unauthorized' }))
       return
     }
 
@@ -246,6 +296,12 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
 
     if (!isAllowedTokenBrokerOrigin(origin)) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+      socket.destroy()
+      return
+    }
+
+    if (!bearerCheckPasses(request, bearerFromUpgradeUrl(request.url))) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
       socket.destroy()
       return
     }
