@@ -44,6 +44,7 @@
     "audit-ci": "^7.1.0",
     "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
+    "happy-dom": "^20.9.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "pino-pretty": "^13.1.3",
