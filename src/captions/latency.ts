@@ -98,13 +98,19 @@ export function createBenchmarkTelemetryRecorder(
 
 function calculateBenchmarkTelemetryMetrics(events: BenchmarkTelemetryEvent[]): BenchmarkTelemetryMetrics {
   const first = (stage: BenchmarkTelemetryStage) => events.find((event) => event.stage === stage)
+  // For metrics like "render after final", the relevant display_update_sent
+  // is the one that fired AFTER the final, not the first one in the session.
+  // display_update_sent fires for partials too, so first() across the whole
+  // session would beat the first final by definition and produce a negative.
+  const firstAfter = (stage: BenchmarkTelemetryStage, after: BenchmarkTelemetryEvent) =>
+    events.find((event) => event.stage === stage && event.atMs >= after.atMs)
   const tokenStart = first('token_request_start')
   const tokenEnd = first('token_request_end')
   const websocketOpen = first('websocket_open')
   const firstAudio = first('first_audio_chunk_sent')
   const firstPartial = first('first_partial_received')
   const finalTranscript = first('final_transcript_received')
-  const displayUpdate = first('display_update_sent')
+  const displayUpdateAfterFinal = finalTranscript ? firstAfter('display_update_sent', finalTranscript) : undefined
 
   return {
     ...(tokenStart && tokenEnd ? { tokenRequestMs: tokenEnd.atMs - tokenStart.atMs } : {}),
@@ -113,8 +119,8 @@ function calculateBenchmarkTelemetryMetrics(events: BenchmarkTelemetryEvent[]): 
     ...(firstAudio && finalTranscript
       ? { finalTranscriptFromFirstAudioMs: finalTranscript.atMs - firstAudio.atMs }
       : {}),
-    ...(finalTranscript && displayUpdate
-      ? { displayUpdateFromFinalTranscriptMs: displayUpdate.atMs - finalTranscript.atMs }
+    ...(finalTranscript && displayUpdateAfterFinal
+      ? { displayUpdateFromFinalTranscriptMs: displayUpdateAfterFinal.atMs - finalTranscript.atMs }
       : {}),
   }
 }

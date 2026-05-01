@@ -35,6 +35,10 @@ interface TokenBrokerResponse {
 export class AssemblyAiLiveSession {
   private socket: WebSocket | undefined
   private closeStatus = 'ASR CLOSED — captions paused'
+  // See DeepgramLiveSession for rationale: live-mic paths must mark this
+  // anchor too so latency metrics are computable for browser-mic / G2 SDK
+  // sessions, not only fixture playback.
+  private sentFirstAudioChunk = false
   private readonly fetchImpl: typeof fetch
   private readonly WebSocketCtor: typeof WebSocket
   private readonly nowMs: () => number
@@ -92,7 +96,10 @@ export class AssemblyAiLiveSession {
     }
 
     this.options.onVisualStatus('AUDIO FIXTURE STREAMING')
-    if (chunks[0]) this.markTelemetry('first_audio_chunk_sent', { seq: chunks[0].seq })
+    if (chunks[0] && !this.sentFirstAudioChunk) {
+      this.markTelemetry('first_audio_chunk_sent', { seq: chunks[0].seq })
+      this.sentFirstAudioChunk = true
+    }
     for (const chunk of chunks) {
       this.socket.send(chunk.data)
       await this.sleep(chunk.durationMs)
@@ -107,6 +114,10 @@ export class AssemblyAiLiveSession {
     if (!this.socket || this.socket.readyState !== openState) {
       this.options.onVisualStatus('AUDIO STREAM FAILED — ASR not connected')
       throw new Error('AssemblyAI WebSocket is not connected')
+    }
+    if (!this.sentFirstAudioChunk) {
+      this.markTelemetry('first_audio_chunk_sent', { seq: chunk.seq })
+      this.sentFirstAudioChunk = true
     }
     this.socket.send(chunk.data)
   }

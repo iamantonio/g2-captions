@@ -41,6 +41,12 @@ interface TokenBrokerResponse {
 export class DeepgramLiveSession {
   private socket: WebSocket | undefined
   private closeStatus = 'ASR CLOSED — captions paused'
+  // Tracks whether `first_audio_chunk_sent` has been marked this session.
+  // Required so live-mic paths (sendPcmChunk) emit the same telemetry
+  // anchor that streamPcmChunks does — without it the
+  // firstPartialFromFirstAudioMs / finalTranscriptFromFirstAudioMs metrics
+  // are unreachable for any browser-mic or G2 SDK session.
+  private sentFirstAudioChunk = false
   private readonly fetchImpl: typeof fetch
   private readonly WebSocketCtor: typeof WebSocket
   private readonly nowMs: () => number
@@ -99,7 +105,10 @@ export class DeepgramLiveSession {
     }
 
     this.options.onVisualStatus('AUDIO FIXTURE STREAMING')
-    if (chunks[0]) this.markTelemetry('first_audio_chunk_sent', { seq: chunks[0].seq })
+    if (chunks[0] && !this.sentFirstAudioChunk) {
+      this.markTelemetry('first_audio_chunk_sent', { seq: chunks[0].seq })
+      this.sentFirstAudioChunk = true
+    }
     for (const chunk of chunks) {
       this.socket.send(chunk.data)
       await this.sleep(chunk.durationMs)
@@ -114,6 +123,10 @@ export class DeepgramLiveSession {
     if (!this.socket || this.socket.readyState !== openState) {
       this.options.onVisualStatus('AUDIO STREAM FAILED — ASR not connected')
       throw new Error('Deepgram WebSocket is not connected')
+    }
+    if (!this.sentFirstAudioChunk) {
+      this.markTelemetry('first_audio_chunk_sent', { seq: chunk.seq })
+      this.sentFirstAudioChunk = true
     }
     this.socket.send(chunk.data)
   }

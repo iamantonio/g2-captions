@@ -1,9 +1,10 @@
 # Phase 13 — First hardware run on G2
 
 Date: 2026-05-01
-Status: Speech-fixture path verified end-to-end on real G2 hardware. Live
-G2 SDK mic path and manual observations (latency, speaker labels, phone
-lock) still pending.
+Status: Speech-fixture path AND live G2 SDK mic path both verified
+end-to-end on real G2 hardware in the same session. Two telemetry bugs
+surfaced and were fixed in the same commit. Multi-speaker diarization
+and phone-lock / background behavior still pending.
 
 ## Build under test
 
@@ -75,32 +76,86 @@ with no manifest change required at this time. The whitelist still
 documents the broker's actual upstream and is kept as advisory /
 contractual rather than enforced.
 
-## Still NOT verified by this run
+## Live G2 SDK mic — second test, 2026-05-01
 
-The fixture path is _playback streaming_ — it does not exercise the
-live G2 microphone. The following remain as Phase 3 observation gaps:
+After the auto-smoke fixture terminated, tapping `Start G2 SDK Audio`
+triggered a fresh ASR session (`fixtureId: g2-sdk-audio`). Two phrases
+were spoken; both produced partials AND a final, both labeled
+`speaker: "0"` by Deepgram. Lens captions appeared in real time during
+the long phrase.
 
-- **`Start G2 SDK Audio` button** — `bridge.audioControl(true)` plus
-  `audioEvent.audioPcm` ingestion. Different code path
-  (`src/audio/g2SdkAudio.ts`); unverified on hardware.
-- **First-partial latency** from the telemetry JSON `<details>` panel
-  on the phone shell.
-- **Final-transcript latency** from the same panel.
-- **Speaker label behavior** with multiple voices.
-- **Phone lock / background behavior** (project's hardest unclaimed
-  surface).
+### Captured transcripts
+
+| Spoken                                         | First partial                                                              | Final                                          | Speaker |
+| ---------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------- | ------- |
+| "Testing."                                     | "Testing."                                                                 | "Testing."                                     | 0       |
+| "The quick brown fox jumps over the lazy dog." | "The quick" → "The quick brown fox" → "The quick brown fox jumps over the" | "The quick brown fox jumps over the lazy dog." | 0       |
+
+### Measured timings (from raw telemetry events)
+
+| Measurement                                  | Value        | Notes                                                                                 |
+| -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------- |
+| WebSocket open from token request            | 53 ms        | broker proxy + bearer-token auth, all over LAN                                        |
+| "Testing." first partial → final             | 534 ms       | end-of-speech detection + stabilization for one-word utterance                        |
+| "The quick brown fox…" first partial → final | 3,490 ms     | 4 partials over 2.1 s, then final; consistent with Deepgram VAD on a long utterance   |
+| Partial cadence on long phrase               | ~1.0 s apart | Comfortably above Wave 3 fix #41's 150 ms throttle window — every partial rendered    |
+| Session duration (token start → WS closed)   | 64 s         | Long tail (~28 s) between final and Stop tap is just the user not pressing the button |
+
+### What this verified
+
+- **`bridge.audioControl(true)` + `audioEvent.audioPcm` path works on
+  real G2 hardware.** Captions appeared from live G2 mic input — not
+  fixture playback — for the first time.
+- **Deepgram speaker labels flow through.** Numeric `0` (Deepgram's
+  scheme) was assigned and propagated to the lens via `CaptionState`
+  and the chip formatter without breakage.
+- **Multi-partial render flow under fix #41.** The three partials of
+  the long phrase arrived ~1 s apart and each rendered, then the final
+  flushed synchronously — the throttle window (150 ms) never collapsed
+  any of them because real ASR partials are spaced much further apart
+  than the window. The throttle's bounded-rate guarantee holds for
+  hypothetical bursty providers without affecting today's traffic.
+
+### Bugs surfaced by this run (fixed in the same commit)
+
+- **Bug A — `displayUpdateFromFinalTranscriptMs: -534`** (negative).
+  `calculateBenchmarkTelemetryMetrics` picked the _first_
+  `display_update_sent` in the session, but `display_update_sent` fires
+  for partials too — so it always beat the first final by definition.
+  Fixed: pick the first `display_update_sent` whose `atMs >=` the first
+  final's `atMs`.
+- **Bug B — `firstPartialFromFirstAudioMs` and
+  `finalTranscriptFromFirstAudioMs` missing.** `DeepgramLiveSession`
+  and `AssemblyAiLiveSession` only emitted `first_audio_chunk_sent`
+  inside `streamPcmChunks`, not `sendPcmChunk` — so the per-chunk live
+  audio path never produced the latency anchor. Fixed: track per-session
+  state and emit on the first `sendPcmChunk` call too.
+
+### Telemetry rerun expected
+
+After the bug-fix commit, a follow-up live-mic run should produce real
+numbers for `firstPartialFromFirstAudioMs` (the headline metric for
+the 800 ms latency budget) and a non-negative
+`displayUpdateFromFinalTranscriptMs` (rendering lag, expected near 0).
+
+## Still NOT verified
+
+- **Speaker diarization with multiple voices** — only one speaker
+  present in this run.
+- **End-to-end speech → glyph latency** — was unrecoverable from this
+  run's telemetry due to Bug B.
+- **Phone lock / background behavior** — project's hardest unclaimed
+  surface.
 - **Continuous-use / daily-driver behavior** — explicitly not claimed
   per CLAUDE.md non-negotiables; would need a separate Tony approval
   gate to attempt.
 
-## Manual observations to record next
-
-Capture before closing Phase 3:
+## Manual observations to capture next run
 
 - G2 firmware/device version
 - Even Hub app version
 - Phone model / OS version
-- The five `metrics` fields from the telemetry JSON
-- Whether `audioEvent.audioPcm` arrives continuously when
-  `Start G2 SDK Audio` is tapped
-- Any lens-visible error state during the live-mic test
+- `firstPartialFromFirstAudioMs` and `finalTranscriptFromFirstAudioMs`
+  (now computable post-bug-fix)
+- Two-speaker conversation transcript to verify diarization labels
+  beyond `0`

@@ -210,5 +210,39 @@ describe('AssemblyAiLiveSession', () => {
     expect(onTelemetry).toHaveBeenCalledWith('first_partial_received', { transcript: 'hello' })
     expect(onTelemetry).toHaveBeenCalledWith('final_transcript_received', { transcript: 'hello Tony', speaker: 'A' })
     expect(onTelemetry).toHaveBeenCalledWith('provider_terminate_sent')
+    // Bug B (2026-05-01 hardware run): the streamPcmChunks call already
+    // marked first_audio. The follow-on sendPcmChunk must NOT remark it,
+    // even though sendPcmChunk now marks first audio for live-mic sessions.
+    const firstAudioCalls = onTelemetry.mock.calls.filter(([stage]) => stage === 'first_audio_chunk_sent')
+    expect(firstAudioCalls).toHaveLength(1)
+  })
+
+  it('sendPcmChunk emits first_audio_chunk_sent on the first call so live-mic latency metrics are computable (Bug B)', async () => {
+    FakeWebSocket.instances = []
+    const onTelemetry = vi.fn()
+    const session = new AssemblyAiLiveSession({
+      tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+      ),
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onTranscript: vi.fn(),
+      onVisualStatus: vi.fn(),
+      onTelemetry,
+    })
+    await session.connect()
+    onTelemetry.mockClear()
+
+    await session.sendPcmChunk({ seq: 5, data: new ArrayBuffer(4), durationMs: 100 })
+    await session.sendPcmChunk({ seq: 6, data: new ArrayBuffer(4), durationMs: 100 })
+    await session.sendPcmChunk({ seq: 7, data: new ArrayBuffer(4), durationMs: 100 })
+
+    const firstAudioCalls = onTelemetry.mock.calls.filter(([stage]) => stage === 'first_audio_chunk_sent')
+    expect(firstAudioCalls).toHaveLength(1)
+    expect(firstAudioCalls[0][1]).toEqual({ seq: 5 })
   })
 })

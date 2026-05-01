@@ -79,4 +79,60 @@ describe('BenchmarkTelemetryRecorder', () => {
     const third = recorder.report()
     expect(third).not.toBe(first)
   })
+
+  it('displayUpdateFromFinalTranscriptMs measures the render that follows the final, not the first partial render', () => {
+    // Reproduces the bug observed in the 2026-05-01 G2 hardware run:
+    // display_update_sent fires for partials AND finals, so picking the
+    // FIRST display update produces a negative number when partials have
+    // already rendered before the first final arrives. The metric must
+    // pair each final with the next display_update_sent.
+    const nowValues = [
+      1000, // token_request_start
+      1010, // token_request_end
+      1050, // websocket_open
+      1100, // first_audio_chunk_sent
+      1500, // first_partial_received
+      1500, // display_update_sent (from partial render — this would have broken the metric)
+      2000, // final_transcript_received
+      2010, // display_update_sent (from final render — this is what the metric should pick)
+    ]
+    const recorder = createBenchmarkTelemetryRecorder({
+      provider: 'deepgram',
+      fixtureId: 'partial-then-final',
+      nowMs: () => nowValues.shift() ?? 9999,
+    })
+
+    recorder.mark('token_request_start')
+    recorder.mark('token_request_end')
+    recorder.mark('websocket_open')
+    recorder.mark('first_audio_chunk_sent', { seq: 1 })
+    recorder.mark('first_partial_received', { transcript: 'hello' })
+    recorder.mark('display_update_sent')
+    recorder.mark('final_transcript_received', { transcript: 'hello world' })
+    recorder.mark('display_update_sent')
+
+    const report = recorder.report()
+    // 2010 (display update after final) - 2000 (final) = 10ms render lag.
+    expect(report.metrics.displayUpdateFromFinalTranscriptMs).toBe(10)
+    expect(report.metrics.displayUpdateFromFinalTranscriptMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('omits displayUpdateFromFinalTranscriptMs when no display update has fired since the first final', () => {
+    // Partial rendered, final received, but no render happened yet — the
+    // metric should be omitted rather than reaching back to the partial render.
+    const nowValues = [1000, 1500, 1500, 2000]
+    const recorder = createBenchmarkTelemetryRecorder({
+      provider: 'deepgram',
+      fixtureId: 'pending-render',
+      nowMs: () => nowValues.shift() ?? 9999,
+    })
+
+    recorder.mark('token_request_start')
+    recorder.mark('first_partial_received')
+    recorder.mark('display_update_sent') // partial render
+    recorder.mark('final_transcript_received') // final at 2000, no render after
+
+    const report = recorder.report()
+    expect(report.metrics.displayUpdateFromFinalTranscriptMs).toBeUndefined()
+  })
 })
