@@ -173,3 +173,38 @@ Pending actions:
 - Tony: `fly auth login`, `fly apps create <name>`, `fly secrets set ...` (DEEPGRAM_API_KEY, VITE_BROKER_AUTH_TOKEN), `fly deploy`.
 - After deploy: rebuild `.ehpk` with `VITE_BROKER_BASE_URL=https://<app>.fly.dev npm run build`, re-upload to Even Hub portal, hardware-smoke verify.
 - Update `app.json` `permissions[].whitelist` to include the chosen Fly hostname (currently only `https://api.deepgram.com` is listed; whitelist was found permissive for LAN/loopback per D-0008-adjacent spike but a production HTTPS origin should be explicit).
+
+### D-0011 — Stay on Deepgram nova-3 streaming; do not adopt Flux
+
+Status: Approved by direction, 2026-05-01
+Decision: **Continue using Deepgram nova-3 streaming on `/v1/listen` for live captioning. Do not migrate to Deepgram Flux.**
+
+Background: Tony asked us to evaluate Flux (https://developers.deepgram.com/docs/flux/quickstart) after a hardware session where the captions felt "all over the place." Initial read mischaracterized Flux as turn-only with no streaming partials; closer reading of the state-machine and configuration docs corrected that — Flux does emit `Update` messages every ~250ms during a turn, and turn boundaries are detected by a built-in model rather than silence-based VAD.
+
+API surface differences (nova-3 → Flux):
+
+- Endpoint: `wss://api.deepgram.com/v1/listen` → `wss://api.deepgram.com/v2/listen`
+- Model: `nova-3` → `flux-general-en` or `flux-general-multi`
+- Message shape: `Results` with `is_final`/`speech_final` flags → `Update` / `EagerEndOfTurn` / `EndOfTurn` / `TurnResumed` / `StartOfTurn`
+- Configuration: ~12 params (diarize, endpointing, interim_results, smart_format, punctuate, etc.) → 4 params (`eot_threshold`, `eager_eot_threshold`, `eot_timeout_ms`, `language_hint`)
+- State machine: implicit (per-result `is_final`) → explicit `Initial` / `TurnOngoing` / `AwaitingEnd` with documented transitions
+
+Rationale for staying on nova-3:
+
+- **No diarization in Flux.** The configuration page lists exactly four parameters; none are speaker-related. The state-machine page has no speaker concept. Flux is built for voice-agent use cases (one user → one agent) where speaker labels aren't needed. For a deaf-first captioner of multi-speaker conversations, losing the `S1`/`S2` speaker chips that were verified working on G2 in v0.3.0 would be a direct regression to product quality.
+- **Likely worse perceived fluidity, not better.** Flux's `Update` cadence is ~0.25s. nova-3's real-world partial cadence on the G2 mic was measured at ~1s during the 2026-05-01 hardware runs (see `docs/13`). Switching to Flux would mean ~4× more in-flight text changes per second. The "all over the place" complaint that motivated this evaluation was the _renderer_ re-mounting DOM on every partial, not nova-3 emitting too many partials. v0.3.0 fixed the renderer (mount-once + incremental updates); switching vendors would re-introduce the underlying frequency at which the new renderer has to absorb changes.
+- **Wrong shape for the use case.** `EagerEndOfTurn` / `TurnResumed` exist so a voice agent can speculatively prepare an LLM response and cancel it if the user keeps talking. A captioner has no analog — there's nothing to draft and cancel. Adopting Flux would mean handling messages designed for a problem we don't have.
+- **Real migration cost.** Different endpoint, different message shapes, mapper rewrite, broker upstream URL change, manifest whitelist additions, broker redeploy, .ehpk rebuild + portal upload. Wave 3 fix #39 (the strategy-pattern refactor I deferred earlier) would _unblock_ a clean vendor swap if/when it's worth doing — but the trigger should be a real benefit, not a hypothetical.
+
+When to revisit:
+
+- If Deepgram adds diarization to Flux (watch the changelog).
+- If a future product surface (a voice-agent feature that talks back to the wearer) makes Eager-EoT speculation valuable.
+- If nova-3's `endpointing`/`interim_results` knobs prove insufficient for caption fluidity even after v0.3.0's renderer changes — and we want a model that emits cleaner turn boundaries.
+
+Cheaper alternatives that stay on nova-3:
+
+- Increase `endpointing` from the default 250 ms to 500–750 ms in `buildDeepgramStreamingUrl` to reduce partial→final flips per minute. Same vendor, same diarization, fewer perceived re-finalizations. One server-side env-driven change; no .ehpk rebuild.
+- Optionally pair with `utterance_end_ms` for cleaner long-utterance segmentation.
+
+Pending actions: none — this is a "do nothing" decision. Re-evaluation triggers listed above.
