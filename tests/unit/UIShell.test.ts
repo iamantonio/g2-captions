@@ -23,6 +23,8 @@ function makeHandlers(): { [K in keyof UIShellHandlers]: ReturnType<typeof vi.fn
     onStartG2SdkAudio: vi.fn(),
     onStopLiveAudio: vi.fn(),
     onTerminate: vi.fn(),
+    onPauseCaptions: vi.fn(),
+    onResumeCaptions: vi.fn(),
   }
 }
 
@@ -68,33 +70,87 @@ describe('UIShell — production mode (default)', () => {
     document.body.replaceChildren()
   })
 
-  it('renders only one primary action button — debug controls are hidden', () => {
+  it('shows the primary action button in the idle state with End session hidden', () => {
     const { root, shell } = build()
     shell.render('READY — starting caption check')
 
-    const buttons = Array.from(root.querySelectorAll('button')).map((b) => b.textContent)
-    expect(buttons).toEqual(['Start captions'])
+    const visibleButtons = Array.from(root.querySelectorAll('button'))
+      .filter((b) => !b.hidden)
+      .map((b) => b.textContent)
+    expect(visibleButtons).toEqual(['Start captions'])
   })
 
   it('clicking the primary button in idle state starts the G2 SDK audio path', () => {
     const { root, handlers, logger, shell } = build()
     shell.render()
 
-    const primary = root.querySelector('button')!
+    const primary = root.querySelector('.g2-shell__primary') as HTMLButtonElement
     primary.click()
     expect(handlers.onStartG2SdkAudio).toHaveBeenCalled()
     expect(logger.stage).toHaveBeenCalledWith('button_start_captions')
   })
 
-  it('shows a Stop button while live and Terminate is invoked when clicked', () => {
-    const { root, handlers, shell } = build()
+  it('shows Pause captions in live state and End session is now visible alongside it', () => {
+    const { root, handlers, logger, shell } = build()
     shell.render('G2 MIC LIVE — captions streaming')
 
-    const buttons = Array.from(root.querySelectorAll('button')).map((b) => b.textContent)
-    expect(buttons).toEqual(['Stop captions'])
+    const primary = root.querySelector('.g2-shell__primary') as HTMLButtonElement
+    expect(primary.textContent).toBe('Pause captions')
 
-    root.querySelector('button')!.click()
+    const endSession = root.querySelector('.g2-shell__secondary') as HTMLButtonElement
+    expect(endSession.hidden).toBe(false)
+    expect(endSession.textContent).toBe('End session')
+
+    primary.click()
+    expect(handlers.onPauseCaptions).toHaveBeenCalled()
+    expect(logger.stage).toHaveBeenCalledWith('button_pause_captions')
+  })
+
+  it('shows Resume captions in paused state and clicking it invokes onResumeCaptions', () => {
+    const { root, handlers, logger, shell } = build()
+    shell.render('CAPTIONS PAUSED — tap ring to resume')
+
+    const primary = root.querySelector('.g2-shell__primary') as HTMLButtonElement
+    expect(primary.textContent).toBe('Resume captions')
+    expect(shell.getLifecycle()).toBe('paused')
+
+    primary.click()
+    expect(handlers.onResumeCaptions).toHaveBeenCalled()
+    expect(logger.stage).toHaveBeenCalledWith('button_resume_captions')
+  })
+
+  it('paused-state status pill shows Paused with the warning class', () => {
+    const { root, shell } = build()
+    shell.render('CAPTIONS PAUSED — tap ring to resume')
+    const pill = root.querySelector('.g2-shell__status') as HTMLElement
+    expect(pill.textContent).toBe('Paused')
+    expect(pill.classList.contains('g2-shell__status--paused')).toBe(true)
+  })
+
+  it('End session link is hidden in idle/connecting/stopped states', () => {
+    const { root, shell } = build()
+    shell.render('READY — starting caption check')
+    let endSession = root.querySelector('.g2-shell__secondary') as HTMLButtonElement
+    expect(endSession.hidden).toBe(true)
+
+    shell.render('CONNECTING — token')
+    endSession = root.querySelector('.g2-shell__secondary') as HTMLButtonElement
+    expect(endSession.hidden).toBe(true)
+
+    shell.render('ASR TERMINATED')
+    endSession = root.querySelector('.g2-shell__secondary') as HTMLButtonElement
+    expect(endSession.hidden).toBe(true)
+  })
+
+  it('End session link is visible in paused state and click invokes onTerminate', () => {
+    const { root, handlers, logger, shell } = build()
+    shell.render('CAPTIONS PAUSED — tap ring to resume')
+
+    const endSession = root.querySelector('.g2-shell__secondary') as HTMLButtonElement
+    expect(endSession.hidden).toBe(false)
+    endSession.click()
     expect(handlers.onTerminate).toHaveBeenCalled()
+    expect(logger.stage).toHaveBeenCalledWith('button_end_session')
   })
 
   it('disables the primary button while connecting so the user cannot double-trigger', () => {
@@ -354,7 +410,7 @@ describe('UIShell — shared behavior across modes', () => {
     shell.render('G2 MIC LIVE — captions streaming')
     const buttonAfter = root.querySelector('.g2-shell__primary')
     expect(buttonBefore).toBe(buttonAfter)
-    expect(buttonAfter?.textContent).toBe('Stop captions')
+    expect(buttonAfter?.textContent).toBe('Pause captions')
   })
 
   it('renderLens surfaces a failure as an inline aria role=status warning (deaf-first)', async () => {
@@ -407,6 +463,13 @@ describe('lifecycleFromStatus', () => {
     expect(lifecycleFromStatus('G2 MIC FAILED — bridge unavailable', 'live')).toBe('stopped')
     expect(lifecycleFromStatus('G2 MIC FAILED — bridge unavailable', 'idle')).toBe('idle')
     expect(lifecycleFromStatus('BROWSER MIC DENIED — captions paused', 'live')).toBe('stopped')
+    expect(lifecycleFromStatus('G2 MIC FAILED — bridge unavailable', 'paused')).toBe('stopped')
+  })
+
+  it('maps paused statuses to "paused"', () => {
+    expect(lifecycleFromStatus('CAPTIONS PAUSED — tap ring to resume', 'live')).toBe('paused')
+    expect(lifecycleFromStatus('G2 MIC PAUSED', 'live')).toBe('paused')
+    expect(lifecycleFromStatus('BROWSER MIC PAUSED', 'live')).toBe('paused')
   })
 
   it('preserves the previous lifecycle for unrecognized statuses', () => {

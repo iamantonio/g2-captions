@@ -135,4 +135,14 @@ describe('formatCaptionFrame', () => {
     expect(ascii.lines.at(-1)).toBe('TOKEN...')
     expect(emdash.lines.at(-1)).toBe('TOKEN...')
   })
+
+  it('maps CAPTIONS PAUSED status to a compact "PAUSED" lens footer', () => {
+    const frame = formatCaptionFrame([], {
+      title: 'G2 CAPTIONS',
+      status: 'CAPTIONS PAUSED — tap ring to resume',
+      maxLines: 4,
+      lineWidth: 34,
+    })
+    expect(frame.lines.at(-1)).toBe('PAUSED')
+  })
 })

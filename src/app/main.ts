@@ -8,6 +8,7 @@ import { G2LensDisplay } from '../display/g2LensDisplay'
 import { createClientLogger } from '../observability/clientLogger'
 import { ASRController } from './ASRController'
 import { AudioController } from './AudioController'
+import { GestureController, type GestureBridge } from './GestureController'
 import { runFixturePrototype } from './runFixturePrototype'
 import {
   getBrokerAuthToken,
@@ -86,14 +87,16 @@ if (app) {
         void audio.stop('ASR TERMINATED')
         shell.render('ASR TERMINATED')
       },
+      onPauseCaptions: () => void audio.stop('CAPTIONS PAUSED — tap ring to resume'),
+      onResumeCaptions: () => void startG2SdkAudio(asr, audio),
     },
   })
 
   shell.render('READY — starting caption check')
-  void initializeG2Display(shell, asr)
+  void initializeG2Display(shell, asr, audio)
 }
 
-async function initializeG2Display(shell: UIShell, asr: ASRController): Promise<void> {
+async function initializeG2Display(shell: UIShell, asr: ASRController, audio: AudioController): Promise<void> {
   try {
     logger.stage('bridge_wait_start')
     const bridge = await waitForEvenAppBridge()
@@ -101,6 +104,18 @@ async function initializeG2Display(shell: UIShell, asr: ASRController): Promise<
     g2AudioBridge = bridge as unknown as G2AudioBridge
     shell.attachG2Display(new G2LensDisplay(bridge))
     await shell.renderLens(shell.getLastFrameText())
+
+    // Wire ring + temple gestures. Single-tap is a context-aware "primary
+    // action" mirroring the on-screen Pause/Resume/Start button; double-
+    // tap is always End-session. Scroll gestures are routed but no-op
+    // until Phase 2 adds caption-history scrollback.
+    new GestureController({
+      bridge: bridge as unknown as GestureBridge,
+      logger,
+      onSingleTap: () => handleGestureSingleTap(asr, audio, shell),
+      onDoubleTap: () => handleGestureDoubleTap(asr, audio, shell),
+    })
+
     if (shouldAutoRunHardwareSmoke(new URL(window.location.href), true)) {
       logger.stage('auto_smoke_start')
       void runHardwareSpeechSmoke(asr, shell)
@@ -109,6 +124,44 @@ async function initializeG2Display(shell: UIShell, asr: ASRController): Promise<
     logger.error('bridge_init_failed', err)
     // Browser/local preview path. Keep every state visible in the phone shell.
   }
+}
+
+/**
+ * Single-tap (ring or temple) maps to whatever the primary on-screen
+ * button would do given the current lifecycle. Mirroring the button
+ * keeps the gesture's behavior predictable: users learn one model and
+ * apply it to either input surface.
+ */
+function handleGestureSingleTap(asr: ASRController, audio: AudioController, shell: UIShell): void {
+  switch (shell.getLifecycle()) {
+    case 'live':
+      void audio.stop('CAPTIONS PAUSED — tap ring to resume')
+      return
+    case 'paused':
+      void startG2SdkAudio(asr, audio)
+      return
+    case 'idle':
+    case 'stopped':
+      void startG2SdkAudio(asr, audio)
+      return
+    case 'connecting':
+    default:
+      // Ignore single-taps while the connection is in flight — accidental
+      // taps shouldn't double-trigger or queue actions.
+      return
+  }
+}
+
+/**
+ * Double-tap (ring or temple) always ends the session. Idempotent when
+ * already stopped — accidental double-taps in a stopped state shouldn't
+ * cause errors.
+ */
+function handleGestureDoubleTap(asr: ASRController, audio: AudioController, shell: UIShell): void {
+  if (shell.getLifecycle() === 'stopped' || shell.getLifecycle() === 'idle') return
+  asr.terminate('ASR TERMINATED')
+  void audio.stop('ASR TERMINATED')
+  shell.render('ASR TERMINATED')
 }
 
 async function runHardwareSpeechSmoke(asr: ASRController, shell: UIShell): Promise<void> {

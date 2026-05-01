@@ -145,6 +145,11 @@ function setupApp() {
         asr.terminate('ASR TERMINATED')
         void audio.stop('ASR TERMINATED')
       },
+      onPauseCaptions: () => void audio.stop('CAPTIONS PAUSED — tap ring to resume'),
+      onResumeCaptions: async () => {
+        await asr.ensureConnected('g2-sdk-audio')
+        await audio.startG2SdkAudio(makeBridge())
+      },
     },
   })
 

@@ -13,6 +13,10 @@ export interface UIShellHandlers {
   onStartG2SdkAudio(): void
   onStopLiveAudio(): void
   onTerminate(): void
+  /** Pause: stop the live audio source but keep the ASR session ready. */
+  onPauseCaptions(): void
+  /** Resume: restart the live audio source after a pause. */
+  onResumeCaptions(): void
 }
 
 export interface UIShellOptions {
@@ -29,7 +33,7 @@ export interface UIShellOptions {
 const DEFAULT_STATUS = 'READY — starting caption check'
 
 /** App-level lifecycle the production UI cares about. */
-export type AppLifecycle = 'idle' | 'connecting' | 'live' | 'stopped'
+export type AppLifecycle = 'idle' | 'connecting' | 'live' | 'paused' | 'stopped'
 
 /**
  * Owns the DOM root.
@@ -75,7 +79,8 @@ export class UIShell {
   private statusPill: HTMLElement | undefined
   private captionView: CaptionView | undefined
   private primaryButton: HTMLButtonElement | undefined
-  private primaryHandler: 'start' | 'stop' = 'start'
+  private endSessionLink: HTMLButtonElement | undefined
+  private primaryAction: 'start' | 'pause' | 'resume' = 'start'
 
   // Debug-mode DOM refs
   private debugFramePre: HTMLPreElement | undefined
@@ -203,15 +208,39 @@ export class UIShell {
     primary.type = 'button'
     primary.addEventListener('click', () => {
       if (primary.disabled) return
-      if (this.primaryHandler === 'stop') {
-        this.options.handlers.onTerminate()
-      } else {
-        this.options.logger.stage('button_start_captions')
-        this.options.handlers.onStartG2SdkAudio()
+      switch (this.primaryAction) {
+        case 'pause':
+          this.options.logger.stage('button_pause_captions')
+          this.options.handlers.onPauseCaptions()
+          return
+        case 'resume':
+          this.options.logger.stage('button_resume_captions')
+          this.options.handlers.onResumeCaptions()
+          return
+        case 'start':
+        default:
+          this.options.logger.stage('button_start_captions')
+          this.options.handlers.onStartG2SdkAudio()
       }
     })
     controls.append(primary)
     this.primaryButton = primary
+
+    // Secondary "End session" link surfaces stop/terminate during a live or
+    // paused session. Hidden in idle/connecting/stopped states. The primary
+    // button stays Pause/Resume/Start; users who want a clean session end
+    // tap this. Ring double-tap also lands here (see GestureController).
+    const endSession = this.doc.createElement('button')
+    endSession.className = 'g2-shell__secondary'
+    endSession.type = 'button'
+    endSession.textContent = 'End session'
+    endSession.hidden = true
+    endSession.addEventListener('click', () => {
+      this.options.logger.stage('button_end_session')
+      this.options.handlers.onTerminate()
+    })
+    controls.append(endSession)
+    this.endSessionLink = endSession
 
     container.append(header, captionRegion, controls)
     this.options.root.append(container)
@@ -233,21 +262,29 @@ export class UIShell {
       const desired = this.primaryFromLifecycle()
       if (button.textContent !== desired.label) button.textContent = desired.label
       if (button.disabled !== desired.disabled) button.disabled = desired.disabled
-      this.primaryHandler = desired.handler
+      this.primaryAction = desired.action
+    }
+
+    const endSession = this.endSessionLink
+    if (endSession) {
+      const shouldShow = this.lifecycle === 'live' || this.lifecycle === 'paused'
+      if (endSession.hidden === shouldShow) endSession.hidden = !shouldShow
     }
   }
 
-  private primaryFromLifecycle(): { label: string; disabled: boolean; handler: 'start' | 'stop' } {
+  private primaryFromLifecycle(): { label: string; disabled: boolean; action: 'start' | 'pause' | 'resume' } {
     switch (this.lifecycle) {
       case 'connecting':
-        return { label: 'Connecting…', disabled: true, handler: 'start' }
+        return { label: 'Connecting…', disabled: true, action: 'start' }
       case 'live':
-        return { label: 'Stop captions', disabled: false, handler: 'stop' }
+        return { label: 'Pause captions', disabled: false, action: 'pause' }
+      case 'paused':
+        return { label: 'Resume captions', disabled: false, action: 'resume' }
       case 'stopped':
-        return { label: 'Start again', disabled: false, handler: 'start' }
+        return { label: 'Start again', disabled: false, action: 'start' }
       case 'idle':
       default:
-        return { label: 'Start captions', disabled: false, handler: 'start' }
+        return { label: 'Start captions', disabled: false, action: 'start' }
     }
   }
 
@@ -350,6 +387,7 @@ export function lifecycleFromStatus(status: string, previous: AppLifecycle): App
   if (/^ASR CONNECTED/i.test(status)) {
     return previous === 'live' ? 'live' : 'connecting'
   }
+  if (/^CAPTIONS PAUSED|^G2 MIC PAUSED|^BROWSER MIC PAUSED/i.test(status)) return 'paused'
   if (
     /^ASR TERMINATED|^ASR CLOSED|^LIVE AUDIO STOPPED|^G2 MIC STOPPED|^BROWSER MIC STOPPED|^SMOKE COMPLETE|^AUDIO SPEECH FIXTURE SENT|^AUDIO FIXTURE SENT/i.test(
       status,
@@ -357,7 +395,7 @@ export function lifecycleFromStatus(status: string, previous: AppLifecycle): App
   )
     return 'stopped'
   if (/FAILED|DENIED|LOST|BLOCKED|SLOW/i.test(status)) {
-    return previous === 'live' ? 'stopped' : 'idle'
+    return previous === 'live' ? 'stopped' : previous === 'paused' ? 'stopped' : 'idle'
   }
   return previous
 }
@@ -370,6 +408,8 @@ function humanStatusLabel(lifecycle: AppLifecycle): string {
       return 'Connecting…'
     case 'live':
       return 'Listening'
+    case 'paused':
+      return 'Paused'
     case 'stopped':
       return 'Stopped'
   }

@@ -61,6 +61,9 @@ function formatFooter(status: string): string {
     [/^AUDIO FIXTURE SENT/i, 'FIXTURE SENT'],
     [/^SMOKE COMPLETE/i, 'SMOKE OK'],
     [/^ASR TERMINATED/i, 'ASR OFF'],
+    [/^CAPTIONS PAUSED/i, 'PAUSED'],
+    [/^G2 MIC PAUSED/i, 'PAUSED'],
+    [/^BROWSER MIC PAUSED/i, 'PAUSED'],
   ]
 
   for (const [pattern, label] of statusMap) {

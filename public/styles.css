@@ -126,6 +126,11 @@ body {
   }
 }
 
+.g2-shell__status--paused {
+  color: var(--g2-warning);
+  border-color: rgba(245, 197, 66, 0.4);
+}
+
 .g2-shell__status--stopped {
   color: var(--g2-text-muted);
   border-color: var(--g2-border);
@@ -307,7 +312,9 @@ body {
 
 .g2-shell__controls {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
@@ -342,6 +349,37 @@ body {
 .g2-shell__primary:focus-visible {
   outline: 3px solid #ffffff;
   outline-offset: 2px;
+}
+
+/* Secondary "End session" affordance. Subtle by design — End is a rare
+ * action; Pause / Resume / Start cover the common cases. Hidden in
+ * idle / connecting / stopped states (UIShell toggles `hidden`). */
+.g2-shell__secondary {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--g2-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 255, 255, 0.18);
+}
+
+.g2-shell__secondary[hidden] {
+  display: none;
+}
+
+.g2-shell__secondary:hover {
+  color: var(--g2-text);
+}
+
+.g2-shell__secondary:focus-visible {
+  outline: 2px solid var(--g2-text-muted);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 [role='status'] {
