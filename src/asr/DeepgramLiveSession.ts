@@ -18,6 +18,12 @@ export interface DeepgramLiveSessionOptions {
   onTranscript: (event: RawAsrEvent) => void
   onVisualStatus: (message: string) => void
   onTelemetry?: (stage: BenchmarkTelemetryStage, details?: BenchmarkTelemetryDetails) => void
+  /**
+   * Optional structured-error sink. Called with the original caught value
+   * before the LiveSession reduces it to a visual status. Use this to wire
+   * Pino on the server side or createClientLogger on the WebView side.
+   */
+  onError?: (stage: string, err: unknown, details?: Record<string, unknown>) => void
   keyterms?: string[]
   sleep?: (ms: number) => Promise<void>
 }
@@ -126,9 +132,10 @@ export class DeepgramLiveSession {
     let response: Response
     try {
       response = await this.fetchImpl(this.options.tokenEndpoint, { method: 'POST' })
-    } catch {
+    } catch (err) {
+      this.options.onError?.('asr_token_fetch_failed', err)
       this.options.onVisualStatus('ASR TOKEN FAILED — check broker')
-      throw new Error('Deepgram token request failed')
+      throw new Error('Deepgram token request failed', { cause: err })
     }
 
     if (!response.ok) {
@@ -162,7 +169,8 @@ export class DeepgramLiveSession {
         telemetryDetails,
       )
       this.options.onTranscript(mapped)
-    } catch {
+    } catch (err) {
+      this.options.onError?.('asr_message_parse_failed', err)
       this.options.onVisualStatus('ASR MESSAGE FAILED — captions paused')
     }
   }

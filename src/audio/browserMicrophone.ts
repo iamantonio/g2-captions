@@ -10,6 +10,11 @@ export interface BrowserMicrophonePcmSourceOptions {
   createAudioContext?: () => AudioContext
   onChunk: (chunk: PcmChunk) => void | Promise<void>
   onVisualStatus: (status: string) => void
+  /**
+   * Optional structured-error sink, called with the original caught value
+   * before reducing it to a visual status.
+   */
+  onError?: (stage: string, err: unknown, details?: Record<string, unknown>) => void
   outputSampleRate?: number
   chunkMs?: number
 }
@@ -33,9 +38,10 @@ export class BrowserMicrophonePcmSource {
     const getUserMedia = this.options.getUserMedia ?? navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
     try {
       this.stream = await getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false } })
-    } catch {
+    } catch (err) {
+      this.options.onError?.('browser_mic_permission_denied', err)
       this.options.onVisualStatus('BROWSER MIC DENIED — captions paused')
-      throw new Error('Browser microphone permission denied')
+      throw new Error('Browser microphone permission denied', { cause: err })
     }
 
     this.audioContext = this.options.createAudioContext?.() ?? new AudioContext()
