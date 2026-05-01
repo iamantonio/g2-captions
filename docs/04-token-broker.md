@@ -51,7 +51,7 @@ The raw AssemblyAI API key is never returned to the browser/WebView.
 - `.gitignore` — ignores local env files and generated artifacts.
 - `.env.example` — placeholder-only local config template.
 - `src/asr/AssemblyAiTokenBroker.ts` — tested temporary token request helper.
-- `tools/assemblyai-token-broker.ts` — local HTTP broker for dev/prototype token generation.
+- `tools/token-broker.ts` — local HTTP broker for dev/prototype token generation.
 - `tests/unit/assemblyAiTokenBroker.test.ts` — token broker tests.
 - `package.json` — added `npm run token-broker`.
 

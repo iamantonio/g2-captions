@@ -11,7 +11,7 @@
     "prototype": "tsx tools/run-fixture-prototype.ts",
     "benchmark:fixtures": "tsx tools/run-fixture-benchmark.ts",
     "hardware:readiness": "tsx tools/run-hardware-readiness.ts",
-    "token-broker": "tsx tools/assemblyai-token-broker.ts",
+    "token-broker": "tsx tools/token-broker.ts",
     "clean": "rm -rf dist artifacts coverage && rm -f *.ehpk",
     "lint": "eslint .",
     "format": "prettier --write .",

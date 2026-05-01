@@ -29,7 +29,7 @@ Packaging the Even Hub plugin: `npm run build && evenhub pack app.json dist -o g
 These come from `README.md` and `DECISIONS.md`. Treat as load-bearing — don't relax them without an explicit Tony approval gate:
 
 - **Deaf-first UX**: no sound-only prompts, errors, or permission states. Every audio/network/ASR/provider failure surfaces visually on both the phone shell and the lens. `VisualStatusKind` in `src/types.ts` enumerates the failure categories that must remain visible.
-- **API keys never in the WebView or in committed files**. Browser/WebView clients only ever see temporary streaming tokens fetched from the local broker; raw vendor keys live in `.env` (gitignored) and are read server-side by `tools/assemblyai-token-broker.ts`.
+- **API keys never in the WebView or in committed files**. Browser/WebView clients only ever see temporary streaming tokens fetched from the local broker; raw vendor keys live in `.env` (gitignored) and are read server-side by `tools/token-broker.ts`.
 - **No live cloud audio, no vendor account creation, no payment, no new API keys without a separate Tony approval step** (`DECISIONS.md` D-0006 / G-0003). Defaulting to fixture-mode harnesses is the safe path.
 - **BLE writes outside the official Even Hub SDK require a per-experiment safety gate** (D-0003). The SDK is the only sanctioned write path today.
 - Don't add continuous-use, background, phone-lock, or "better than Conversate" claims until physical hardware benchmark evidence exists (`docs/10-live-audio-gates.md`, `docs/11-hardware-smoke.md`).
@@ -50,15 +50,15 @@ The pipeline is intentionally split into separable interfaces (D-0001, D-0005) s
 - `src/app/main.ts` — WebView entry. Awaits `waitForEvenAppBridge()` from `@evenrealities/even_hub_sdk` (graceful fallback when running in a plain browser), wires buttons for fixture streaming and live sessions, and POSTs structured client logs back to the broker's `/client-log` endpoint.
 - `src/app/runtimeConfig.ts` — Single source for broker URLs (token, streaming, log) and `?autoSmoke=0` query handling. The broker is always at the **same hostname as the page on port 8787** — this matters for G2 hardware smoke testing over LAN, where `localhost` won't resolve from the headset.
 
-### Token broker (`tools/assemblyai-token-broker.ts`)
+### Token broker (`tools/token-broker.ts`)
 
-Despite the filename, this single broker handles **both** vendors. It exposes:
+Single broker that handles **both** vendors. It exposes:
 
 - `POST /assemblyai/token` and `POST /deepgram/token` — issues short-lived streaming tokens.
 - WebSocket `/deepgram/listen` — proxies browser audio frames upstream so the API key stays server-side.
 - `POST /client-log` — accepts structured client telemetry.
 
-Origin allow-listing is enforced via `src/asr/AssemblyAiTokenBrokerServer.ts` (`isAllowedTokenBrokerOrigin`, `getTokenBrokerCorsOrigin`, `getTokenBrokerBindHost`). LAN host binding is required for G2 hardware smoke; the helpers handle that.
+Origin allow-listing is enforced via `src/asr/tokenBrokerServer.ts` (`isAllowedTokenBrokerOrigin`, `getTokenBrokerCorsOrigin`, `getTokenBrokerBindHost`). LAN host binding is required for G2 hardware smoke; the helpers handle that.
 
 ### Even Hub manifest (`app.json`)
 

@@ -5,7 +5,7 @@ import {
   getTokenBrokerBindHost,
   getTokenBrokerCorsOrigin,
   isAllowedTokenBrokerOrigin,
-} from '../src/asr/AssemblyAiTokenBrokerServer'
+} from '../src/asr/tokenBrokerServer'
 import { buildDeepgramProxyHeaders, buildDeepgramProxyUpstreamUrl } from '../src/asr/DeepgramProxy'
 import { createDeepgramToken, readDeepgramApiKeyFromEnv } from '../src/asr/DeepgramTokenBroker'
 
@@ -14,17 +14,25 @@ const REQUEST_BODY_BYTE_CAP = 10_000
 // we close the browser-side socket rather than buffer indefinitely.
 const PROXY_PENDING_BUFFER_BYTE_CAP = 1_000_000
 
-function parseBrokerPort(raw: string | undefined): number {
+function parseBrokerPort(raw: string | undefined, sourceName: string): number {
   const fallback = 8787
   if (raw === undefined) return fallback
   const parsed = Number.parseInt(raw, 10)
   if (!Number.isInteger(parsed) || parsed <= 0 || parsed >= 65536) {
-    throw new Error(`ASSEMBLYAI_TOKEN_BROKER_PORT must be an integer in 1..65535 (got ${JSON.stringify(raw)})`)
+    throw new Error(`${sourceName} must be an integer in 1..65535 (got ${JSON.stringify(raw)})`)
   }
   return parsed
 }
 
-const port = parseBrokerPort(process.env.ASSEMBLYAI_TOKEN_BROKER_PORT)
+// TOKEN_BROKER_PORT is the documented name. ASSEMBLYAI_TOKEN_BROKER_PORT is a
+// legacy alias kept for backward-compat with existing .env files.
+if (process.env.ASSEMBLYAI_TOKEN_BROKER_PORT && !process.env.TOKEN_BROKER_PORT) {
+  console.warn('[token-broker] ASSEMBLYAI_TOKEN_BROKER_PORT is deprecated. Use TOKEN_BROKER_PORT in .env instead.')
+}
+const port = parseBrokerPort(
+  process.env.TOKEN_BROKER_PORT ?? process.env.ASSEMBLYAI_TOKEN_BROKER_PORT,
+  process.env.TOKEN_BROKER_PORT ? 'TOKEN_BROKER_PORT' : 'ASSEMBLYAI_TOKEN_BROKER_PORT',
+)
 const host = getTokenBrokerBindHost(process.env)
 const deepgramApiKey = readDeepgramApiKeyFromEnv(process.env)
 const assemblyAiApiKey = process.env.ASSEMBLYAI_API_KEY?.trim()

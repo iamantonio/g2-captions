@@ -1,5 +1,9 @@
 export function getTokenBrokerBindHost(env: NodeJS.ProcessEnv): string {
-  return env.ASSEMBLYAI_TOKEN_BROKER_HOST || env.HOST || '127.0.0.1'
+  // TOKEN_BROKER_HOST is the documented name. ASSEMBLYAI_TOKEN_BROKER_HOST is
+  // the legacy AssemblyAI-only name kept for backward-compat with existing
+  // .env files. HOST is the generic fallback used by hardware-readiness
+  // commands ("HOST=0.0.0.0 npm run token-broker").
+  return env.TOKEN_BROKER_HOST || env.ASSEMBLYAI_TOKEN_BROKER_HOST || env.HOST || '127.0.0.1'
 }
 
 function isPrivateLanHost(hostname: string): boolean {
