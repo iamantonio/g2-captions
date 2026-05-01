@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DeepgramLiveSession } from '../../src/asr/DeepgramLiveSession'
+import { DeepgramLiveSession, computeMultiSpeakerWordCounts } from '../../src/asr/DeepgramLiveSession'
 import { buildDeepgramCloseStreamMessage } from '../../src/asr/DeepgramStreamingClient'
 
 class FakeWebSocket {
@@ -166,5 +166,128 @@ describe('DeepgramLiveSession', () => {
     const firstAudioCalls = onTelemetry.mock.calls.filter(([stage]) => stage === 'first_audio_chunk_sent')
     expect(firstAudioCalls).toHaveLength(1)
     expect(firstAudioCalls[0][1]).toEqual({ seq: 0 })
+  })
+
+  it('handleMessage emits speakerWordCounts on telemetry when 2+ distinct speakers appear in a single Results event', async () => {
+    // Diagnostic for the 2026-05-01 conversational hardware run: every
+    // utterance came back tagged speaker:0 even with two voices. This
+    // test locks in that *if* Deepgram does emit varied speakers within
+    // a Results message, the per-speaker count is surfaced in the
+    // telemetry JSON so the next hardware run can distinguish "vendor
+    // didn't diarize" from "our top-level speaker collapse hid it".
+    FakeWebSocket.instances = []
+    const onTelemetry = vi.fn()
+    const session = new DeepgramLiveSession({
+      streamingEndpoint: 'ws://127.0.0.1:8787/deepgram/listen',
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onTranscript: vi.fn(),
+      onVisualStatus: vi.fn(),
+      onTelemetry,
+    })
+    await session.connect()
+
+    FakeWebSocket.instances[0].onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify({
+          type: 'Results',
+          is_final: true,
+          channel: {
+            alternatives: [
+              {
+                transcript: 'Hi babe Hi',
+                words: [
+                  { word: 'Hi', start: 0, end: 0.2, speaker: 0 },
+                  { word: 'babe', start: 0.2, end: 0.4, speaker: 0 },
+                  { word: 'Hi', start: 0.6, end: 0.8, speaker: 1 },
+                ],
+              },
+            ],
+          },
+        }),
+      }),
+    )
+
+    const finalCalls = onTelemetry.mock.calls.filter(([stage]) => stage === 'final_transcript_received')
+    expect(finalCalls).toHaveLength(1)
+    expect(finalCalls[0][1]?.speakerWordCounts).toEqual({ '0': 2, '1': 1 })
+  })
+
+  it('handleMessage omits speakerWordCounts when only one speaker label appears (the common single-speaker case)', async () => {
+    FakeWebSocket.instances = []
+    const onTelemetry = vi.fn()
+    const session = new DeepgramLiveSession({
+      streamingEndpoint: 'ws://127.0.0.1:8787/deepgram/listen',
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onTranscript: vi.fn(),
+      onVisualStatus: vi.fn(),
+      onTelemetry,
+    })
+    await session.connect()
+
+    FakeWebSocket.instances[0].onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify({
+          type: 'Results',
+          is_final: true,
+          channel: {
+            alternatives: [
+              {
+                transcript: 'Testing',
+                words: [{ word: 'Testing', start: 0, end: 0.5, speaker: 0 }],
+              },
+            ],
+          },
+        }),
+      }),
+    )
+
+    const finalCalls = onTelemetry.mock.calls.filter(([stage]) => stage === 'final_transcript_received')
+    expect(finalCalls).toHaveLength(1)
+    expect(finalCalls[0][1]?.speakerWordCounts).toBeUndefined()
+  })
+})
+
+describe('computeMultiSpeakerWordCounts', () => {
+  it('counts words per speaker only when 2+ distinct speakers are present', () => {
+    expect(
+      computeMultiSpeakerWordCounts([
+        { text: 'Hi', startMs: 0, endMs: 100, speaker: '0' },
+        { text: 'babe', startMs: 100, endMs: 200, speaker: '0' },
+        { text: 'Hi', startMs: 300, endMs: 400, speaker: '1' },
+      ]),
+    ).toEqual({ '0': 2, '1': 1 })
+  })
+
+  it('returns undefined when only one speaker is present', () => {
+    expect(
+      computeMultiSpeakerWordCounts([
+        { text: 'Testing', startMs: 0, endMs: 500, speaker: '0' },
+        { text: 'one', startMs: 500, endMs: 700, speaker: '0' },
+      ]),
+    ).toBeUndefined()
+  })
+
+  it('returns undefined when no words have speaker info', () => {
+    expect(
+      computeMultiSpeakerWordCounts([
+        { text: 'Testing', startMs: 0, endMs: 500 },
+        { text: 'one', startMs: 500, endMs: 700 },
+      ]),
+    ).toBeUndefined()
+  })
+
+  it('returns undefined for empty or missing words', () => {
+    expect(computeMultiSpeakerWordCounts(undefined)).toBeUndefined()
+    expect(computeMultiSpeakerWordCounts([])).toBeUndefined()
+  })
+
+  it('ignores words without speaker info while still counting the rest', () => {
+    expect(
+      computeMultiSpeakerWordCounts([
+        { text: 'Hi', startMs: 0, endMs: 100, speaker: '0' },
+        { text: 'um', startMs: 100, endMs: 150 },
+        { text: 'there', startMs: 200, endMs: 300, speaker: '1' },
+      ]),
+    ).toEqual({ '0': 1, '1': 1 })
   })
 })

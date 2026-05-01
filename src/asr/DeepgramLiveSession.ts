@@ -189,6 +189,8 @@ export class DeepgramLiveSession {
       })
       const telemetryDetails: BenchmarkTelemetryDetails = { transcript: mapped.text }
       if (mapped.speaker && mapped.speaker !== '?') telemetryDetails.speaker = mapped.speaker
+      const speakerWordCounts = computeMultiSpeakerWordCounts(mapped.words)
+      if (speakerWordCounts) telemetryDetails.speakerWordCounts = speakerWordCounts
       this.markTelemetry(
         mapped.status === 'final' ? 'final_transcript_received' : 'first_partial_received',
         telemetryDetails,
@@ -207,4 +209,23 @@ export class DeepgramLiveSession {
     }
     this.options.onTelemetry?.(stage, details)
   }
+}
+
+/**
+ * Per-speaker word counts within a single Results message — but only when
+ * 2+ distinct speakers appear. The asymmetry is deliberate: a session
+ * where this field never appears tells us Deepgram itself isn't
+ * separating voices (model limitation). A session where it appears
+ * tells us the upstream IS diarizing and our top-level speaker collapse
+ * is hiding it (mapper bug). Either signal answers the question with
+ * one line of telemetry — see the 2026-05-01 G2 hardware run report.
+ */
+export function computeMultiSpeakerWordCounts(words: RawAsrEvent['words']): Record<string, number> | undefined {
+  if (!words || words.length === 0) return undefined
+  const counts: Record<string, number> = {}
+  for (const word of words) {
+    if (word.speaker === undefined) continue
+    counts[word.speaker] = (counts[word.speaker] ?? 0) + 1
+  }
+  return Object.keys(counts).length >= 2 ? counts : undefined
 }

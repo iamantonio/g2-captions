@@ -131,24 +131,80 @@ the long phrase.
   audio path never produced the latency anchor. Fixed: track per-session
   state and emit on the first `sendPcmChunk` call too.
 
-### Telemetry rerun expected
+## Live G2 SDK mic — third test (clean), 2026-05-01
 
-After the bug-fix commit, a follow-up live-mic run should produce real
-numbers for `firstPartialFromFirstAudioMs` (the headline metric for
-the 800 ms latency budget) and a non-negative
-`displayUpdateFromFinalTranscriptMs` (rendering lag, expected near 0).
+After Bugs A + B fixed, a third run with the user speaking immediately
+produced meaningful numbers and a real WER baseline. Three utterances
+spoken solo in a quiet room:
+
+| Spoken                                                       | Final                                                        | WER   |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ----- |
+| "The quick brown fox jumps over the lazy dog."               | "The quick brown fox jumps over the lazy dog."               | 0/9   |
+| "Not quite an accurate representation of me, unfortunately." | "Not quite an accurate representation of me, unfortunately." | 0/8   |
+| "The gestures/guests are spot on. It's all good, though."    | "The guests are spot on. It's all good, though."             | 0–1/9 |
+
+**~0–4% WER on 26 words, single speaker, quiet room.** First measured
+WER datapoint on real hardware — a CLAUDE.md gate.
+
+| Metric                               | Value                                                                    |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| `firstPartialFromFirstAudioMs`       | 1,029 ms (includes user speak-lag)                                       |
+| `displayUpdateFromFinalTranscriptMs` | 0 ms                                                                     |
+| Mid-stream correction                | "lake" → "lazy dog", "an" → "me", "gesture" → "guests" all rendered live |
+
+## Live G2 SDK mic — fourth test (conversational), 2026-05-01
+
+Two-speaker back-and-forth, ~62 seconds, ~38 words:
+
+| Final                                                          | WER               |
+| -------------------------------------------------------------- | ----------------- |
+| "Hi, babe. Hi."                                                | 0/3               |
+| "What? How's working?"                                         | 1/4 (lost "it")   |
+| "Talk to me. Oh my god. What do want me to talk to you about?" | 1/14 (lost "you") |
+| "This is pretty cool. I created my own app"                    | 0/9               |
+| "and it's working pretty good."                                | 0/5               |
+| "Yeah."                                                        | 0/1               |
+| "Looking forward to the movie? Yep."                           | 0/6               |
+
+**~5% conversational WER on real hardware.** Quality held under turn-taking.
+
+| Metric                               | Value                  |
+| ------------------------------------ | ---------------------- |
+| `firstPartialFromFirstAudioMs`       | 1,982 ms               |
+| `displayUpdateFromFinalTranscriptMs` | 0 ms                   |
+| Session duration                     | 62 s — longest run yet |
+
+### Diarization gap (open)
+
+**Every utterance came back tagged `speaker: "0"` despite two clearly
+distinct voices.** `diarize=true` is verified to be on the upstream
+URL (default in `buildDeepgramStreamingUrl`); the mapper extracts
+`word.speaker` from each Results word. So either:
+
+- **(a)** Deepgram's nova-3 model returned all-speaker-0 — single-channel
+  G2 mic + similar voice profiles + short utterances may simply be too
+  hard for mono diarization. Vendor / model limitation.
+- **(b)** Deepgram returned varied speakers within a Results message
+  but our top-level speaker collapse
+  (`words.find((w) => w.speaker !== undefined)?.speaker`) hid them.
+  Mapper bug.
+
+To resolve in the next conversational run: a diagnostic field
+`speakerWordCounts` (added in the same commit as this doc update) now
+appears in the telemetry JSON whenever 2+ distinct speakers are seen
+in a single Results message. **Absence of the field across an entire
+session = (a). Presence anywhere = (b).** No broker-log dive required.
 
 ## Still NOT verified
 
-- **Speaker diarization with multiple voices** — only one speaker
-  present in this run.
-- **End-to-end speech → glyph latency** — was unrecoverable from this
-  run's telemetry due to Bug B.
+- **Speaker diarization with multiple voices** — open question above;
+  next conversational run will distinguish vendor vs. mapper failure.
 - **Phone lock / background behavior** — project's hardest unclaimed
   surface.
 - **Continuous-use / daily-driver behavior** — explicitly not claimed
   per CLAUDE.md non-negotiables; would need a separate Tony approval
   gate to attempt.
+- **Noisy-environment WER** — only quiet-room data so far.
 
 ## Manual observations to capture next run
 

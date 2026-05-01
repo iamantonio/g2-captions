@@ -33,6 +33,18 @@ export interface BenchmarkTelemetryDetails {
   transcript?: string
   speaker?: string
   message?: string
+  /**
+   * Diagnostic for Deepgram diarization. Emitted on partial / final events
+   * only when the upstream response contained 2+ distinct word-level
+   * speaker labels in a single Results message — i.e., when our top-level
+   * `speaker` collapse is hiding diarization that the vendor actually
+   * returned. Absence of this field across an entire session means the
+   * vendor never returned multi-speaker word-level info — a model
+   * limitation, not a parsing bug. Surfaced in the telemetry JSON so
+   * hardware-run readouts can distinguish the two failure modes without
+   * needing broker-side logs.
+   */
+  speakerWordCounts?: Record<string, number>
 }
 
 export interface BenchmarkTelemetryEvent extends BenchmarkTelemetryDetails {
