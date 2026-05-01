@@ -1,6 +1,8 @@
 # Phase 3 — Hardware / Device Smoke Plan
 
-Status: readiness path documented; physical-device observations still need an actual Even Hub + G2 run.
+Status: readiness path documented; first hardware run completed
+2026-05-01 — see `docs/13-first-hardware-run.md` for the run report.
+Live G2-mic path and manual latency observations still pending.
 
 ## Goal
 
