@@ -121,6 +121,10 @@ function setupApp() {
     state,
     telemetry,
     logger,
+    // The wiring smoke exercises every button-driven flow, so we use the
+    // debug-mode UI which exposes all of them. Production-mode end-user
+    // wiring is covered by the per-mode UIShell unit tests.
+    debug: true,
     handlers: {
       onConnectDeepgram: () => {
         connectCalls += 1

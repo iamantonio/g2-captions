@@ -32,6 +32,19 @@ export function shouldAutoRunHardwareSmoke(locationUrl: URL, hasEvenBridge: bool
 }
 
 /**
+ * Debug mode exposes all internal controls (fixture buttons, browser-mic,
+ * raw connect, telemetry JSON panel). Default mode (no flag) shows only
+ * the user-facing caption surface and a single Start/Stop action.
+ *
+ * Set `?debug=1` on the URL to enable. The hardware-readiness QR keeps the
+ * default off so a real device install doesn't surface developer controls
+ * to end users.
+ */
+export function isDebugMode(locationUrl: URL): boolean {
+  return locationUrl.searchParams.get('debug') === '1'
+}
+
+/**
  * Reads the broker bearer token from Vite's build-time-injected env. The
  * broker reads the same VITE_BROKER_AUTH_TOKEN value at boot. Returns
  * undefined when unset — the broker accepts unauthenticated requests in that

@@ -132,3 +132,21 @@ Pending actions:
 - ~~Tony: ask Even Realities whether G2 has a wearer-speaking signal.~~ **Done 2026-05-01: no signal exposed.**
 - Next conversational hardware run: read `speakerWordCounts` in the telemetry JSON to close the diarization gap (vendor vs. mapper).
 - Reconvene this decision once the diarization answer is in. If vendor limitation → swap (D-0005 / fix #39) → then build Path 2. If mapper bug → fix mapper to expose per-utterance speaker breakdown → then build Path 2 directly.
+
+### D-0009 — Production UI vs. debug UI split
+
+Status: Approved by direction, 2026-05-01
+Decision: **Default WebView UI is the user-facing production view (single primary action, captioned surface, status pill). Debug mode is opt-in via `?debug=1` and exposes all internal controls (fixture buttons, raw Connect, browser-mic, telemetry JSON panel).**
+
+Rationale:
+
+- The previous UI (a `<pre>` caption frame plus seven raw debug buttons and an open telemetry `<details>`) was usable for development but actively hostile to a real end user — too many controls, no clear primary action, no visual hierarchy, and a JSON dump under the captions.
+- "Ship the product out" requires the WebView to look like a product on first install. That means: a single Start/Stop affordance, a calm caption surface, status communicated via plain text labels (not color alone — deaf-first), and developer noise hidden by default.
+- Debug mode (`?debug=1`) is preserved as-is so all existing hardware-smoke / fixture-playback flows continue to work for developers; the appWiring smoke test runs in debug mode for the same reason.
+- A small `lifecycleFromStatus` helper maps the controllers' visual-status strings (`G2 MIC LIVE`, `CONNECTING — token`, `ASR TERMINATED`, etc.) into a four-state UI lifecycle (`idle` / `connecting` / `live` / `stopped`). This keeps the new UI's button labels and status pill in sync with the deaf-first invariant: every meaningful state change still flows through a visual status, the production UI just consumes them as enum values instead of raw strings.
+- WCAG AAA-target contrast palette in `public/styles.css`. Status pill uses both color **and** text label (e.g. `Listening`) so users who rely on text-to-speech or are colorblind get the same information.
+
+Pending actions:
+
+- Hardware-smoke the new production UI on real G2 to confirm: (a) the single Start button kicks off the G2 SDK audio path and the lens shows live captions, (b) the lens surface is unaffected (production-mode root produces the same frame text via `formatCaptionFrame`).
+- `?autoSmoke=1` continues to work in production mode for hardware QR launches; verify next run.

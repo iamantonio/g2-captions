@@ -15,6 +15,7 @@ import {
   getDefaultStreamingEndpoint,
   getDefaultTokenEndpoint,
   getSpeechFixtureUrl,
+  isDebugMode,
   shouldAutoRunHardwareSmoke,
 } from './runtimeConfig'
 import { TelemetryReporter } from './TelemetryReporter'
@@ -72,6 +73,7 @@ if (app) {
     state,
     telemetry,
     logger,
+    debug: isDebugMode(locationUrl),
     handlers: {
       onConnectDeepgram: () => void asr.connect(),
       onStreamSilentFixture: () => void streamSilentFixture(asr, shell),

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { UIShell, type UIShellHandlers } from '../../src/app/UIShell'
+import { UIShell, lifecycleFromStatus, type UIShellHandlers } from '../../src/app/UIShell'
 import { CaptionState } from '../../src/captions/CaptionState'
 import { TelemetryReporter } from '../../src/app/TelemetryReporter'
 import type { ClientLogger } from '../../src/observability/clientLogger'
@@ -29,6 +29,7 @@ function makeHandlers(): { [K in keyof UIShellHandlers]: ReturnType<typeof vi.fn
 
 interface BuildOpts {
   recorderEvents?: number
+  debug?: boolean
 }
 
 function makeRoot(): HTMLElement {
@@ -59,21 +60,106 @@ function build(opts: BuildOpts = {}) {
   })
   const logger = makeLogger()
   const handlers = makeHandlers()
-  const shell = new UIShell({ root, state, telemetry, logger, handlers })
+  const shell = new UIShell({ root, state, telemetry, logger, handlers, debug: opts.debug ?? false })
   return { root, state, telemetry, logger, handlers, shell }
 }
 
-describe('UIShell', () => {
+describe('UIShell — production mode (default)', () => {
   beforeEach(() => {
     document.body.replaceChildren()
   })
 
-  it('renders the caption frame and the seven action buttons on first render', () => {
+  it('renders only one primary action button — debug controls are hidden', () => {
     const { root, shell } = build()
     shell.render('READY — starting caption check')
 
-    const pre = root.querySelector('pre')
+    const buttons = Array.from(root.querySelectorAll('button')).map((b) => b.textContent)
+    expect(buttons).toEqual(['Start captions'])
+  })
+
+  it('clicking the primary button in idle state starts the G2 SDK audio path', () => {
+    const { root, handlers, logger, shell } = build()
+    shell.render()
+
+    const primary = root.querySelector('button')!
+    primary.click()
+    expect(handlers.onStartG2SdkAudio).toHaveBeenCalled()
+    expect(logger.stage).toHaveBeenCalledWith('button_start_captions')
+  })
+
+  it('shows a Stop button while live and Terminate is invoked when clicked', () => {
+    const { root, handlers, shell } = build()
+    shell.render('G2 MIC LIVE — captions streaming')
+
+    const buttons = Array.from(root.querySelectorAll('button')).map((b) => b.textContent)
+    expect(buttons).toEqual(['Stop captions'])
+
+    root.querySelector('button')!.click()
+    expect(handlers.onTerminate).toHaveBeenCalled()
+  })
+
+  it('disables the primary button while connecting so the user cannot double-trigger', () => {
+    const { root, handlers, shell } = build()
+    shell.render('CONNECTING — token')
+
+    const button = root.querySelector('button')!
+    expect(button.disabled).toBe(true)
+    expect(button.textContent).toBe('Connecting…')
+
+    button.click()
+    expect(handlers.onStartG2SdkAudio).not.toHaveBeenCalled()
+  })
+
+  it('shows "Start again" after a stopped state so the user understands the action restarts', () => {
+    const { root, shell } = build()
+    shell.render('ASR TERMINATED')
+    const button = root.querySelector('button')!
+    expect(button.textContent).toBe('Start again')
+  })
+
+  it('renders a status pill with an aria-live region for screen readers', () => {
+    const { root, shell } = build()
+    shell.render('G2 MIC LIVE — captions streaming')
+
+    const pill = root.querySelector('.g2-shell__status')
+    expect(pill).not.toBeNull()
+    expect(pill?.getAttribute('aria-live')).toBe('polite')
+    expect(pill?.textContent).toBe('Listening')
+    expect(pill?.classList.contains('g2-shell__status--live')).toBe(true)
+  })
+
+  it('marks the caption region as a polite live log for screen readers (deaf-first)', () => {
+    const { root, shell } = build()
+    shell.render()
+    const region = root.querySelector('.g2-shell__captions')
+    expect(region?.getAttribute('role')).toBe('log')
+    expect(region?.getAttribute('aria-live')).toBe('polite')
+    expect(region?.getAttribute('aria-label')).toBe('Live captions')
+  })
+
+  it('hides the telemetry JSON panel even when events exist (production)', () => {
+    const { telemetry, root, shell } = build({ recorderEvents: 1 })
+    telemetry.start('test')
+    shell.render()
+    expect(root.querySelector('details')).toBeNull()
+  })
+
+  it('renders the caption frame in the primary surface', () => {
+    const { root, shell } = build()
+    shell.render('READY — starting caption check')
+    const pre = root.querySelector('.g2-shell__frame')
     expect(pre?.textContent).toContain('G2 CAPTIONS')
+  })
+})
+
+describe('UIShell — debug mode (?debug=1)', () => {
+  beforeEach(() => {
+    document.body.replaceChildren()
+  })
+
+  it('renders all seven action buttons', () => {
+    const { root, shell } = build({ debug: true })
+    shell.render('READY — starting caption check')
 
     const buttons = Array.from(root.querySelectorAll('button')).map((b) => b.textContent)
     expect(buttons).toEqual([
@@ -88,7 +174,7 @@ describe('UIShell', () => {
   })
 
   it('button clicks invoke the corresponding handler and log the button stage', () => {
-    const { root, handlers, logger, shell } = build()
+    const { root, handlers, logger, shell } = build({ debug: true })
     shell.render()
 
     const byLabel = (label: string) => Array.from(root.querySelectorAll('button')).find((b) => b.textContent === label)!
@@ -117,26 +203,39 @@ describe('UIShell', () => {
     expect(handlers.onTerminate).toHaveBeenCalled()
   })
 
-  it('persists the visual status across renders so re-renders without an explicit status keep state', () => {
-    const { shell } = build()
-    shell.render('AUDIO FIXTURE STREAMING')
-    expect(shell.getVisualStatus()).toBe('AUDIO FIXTURE STREAMING')
-    shell.render()
-    expect(shell.getVisualStatus()).toBe('AUDIO FIXTURE STREAMING')
-  })
-
   it('hides the telemetry panel when the recorder has no events, shows it once events exist', () => {
-    const empty = build({ recorderEvents: 0 })
+    const empty = build({ recorderEvents: 0, debug: true })
     empty.telemetry.start('test')
     empty.shell.render()
     expect(empty.root.querySelector('details')).toBeNull()
 
-    const populated = build({ recorderEvents: 1 })
+    const populated = build({ recorderEvents: 1, debug: true })
     populated.telemetry.start('test')
     populated.shell.render()
     const details = populated.root.querySelector('details')
     expect(details).not.toBeNull()
     expect(details?.querySelector('pre')?.getAttribute('aria-label')).toBe('Latest benchmark telemetry JSON')
+  })
+
+  it('render() clears prior buttons so re-renders never duplicate them', () => {
+    const { root, shell } = build({ debug: true })
+    shell.render()
+    shell.render()
+    expect(root.querySelectorAll('button')).toHaveLength(7)
+  })
+})
+
+describe('UIShell — shared behavior across modes', () => {
+  beforeEach(() => {
+    document.body.replaceChildren()
+  })
+
+  it('persists the visual status across renders', () => {
+    const { shell } = build()
+    shell.render('AUDIO FIXTURE STREAMING')
+    expect(shell.getVisualStatus()).toBe('AUDIO FIXTURE STREAMING')
+    shell.render()
+    expect(shell.getVisualStatus()).toBe('AUDIO FIXTURE STREAMING')
   })
 
   it('renders a CaptionState change after re-render so transcripts appear in the frame', () => {
@@ -180,15 +279,48 @@ describe('UIShell', () => {
     const { shell, root, logger } = build()
     shell.attachG2Display(display)
     await shell.renderLens('frame text')
-    const status = root.querySelector('[role="status"]')
-    expect(status?.textContent).toBe('G2 DISPLAY FAILED — startup rejected')
+    const statusElements = Array.from(root.querySelectorAll('[role="status"]'))
+    const lensFailure = statusElements.find((el) => el.textContent === 'G2 DISPLAY FAILED — startup rejected')
+    expect(lensFailure).toBeDefined()
     expect(logger.error).toHaveBeenCalledWith('g2_display_failed', expect.any(Error), { frameText: 'frame text' })
   })
+})
 
-  it('render() clears prior buttons so we never render duplicates after subsequent renders', () => {
-    const { root, shell } = build()
-    shell.render()
-    shell.render()
-    expect(root.querySelectorAll('button')).toHaveLength(7)
+describe('lifecycleFromStatus', () => {
+  it('maps live-mic statuses to "live"', () => {
+    expect(lifecycleFromStatus('G2 MIC LIVE — captions streaming', 'connecting')).toBe('live')
+    expect(lifecycleFromStatus('BROWSER MIC LIVE — captions streaming', 'idle')).toBe('live')
+  })
+
+  it('maps progress statuses to "connecting"', () => {
+    expect(lifecycleFromStatus('CONNECTING — token', 'idle')).toBe('connecting')
+    expect(lifecycleFromStatus('CONNECTING — ASR', 'idle')).toBe('connecting')
+    expect(lifecycleFromStatus('G2 MIC STARTING — waiting audio', 'idle')).toBe('connecting')
+    expect(lifecycleFromStatus('HARDWARE SMOKE — connecting ASR', 'idle')).toBe('connecting')
+  })
+
+  it('treats ASR CONNECTED as still connecting until mic-live arrives', () => {
+    expect(lifecycleFromStatus('ASR CONNECTED — waiting audio', 'connecting')).toBe('connecting')
+  })
+
+  it('keeps lifecycle at "live" when ASR CONNECTED arrives mid-session (re-render)', () => {
+    expect(lifecycleFromStatus('ASR CONNECTED — waiting audio', 'live')).toBe('live')
+  })
+
+  it('maps termination statuses to "stopped"', () => {
+    expect(lifecycleFromStatus('ASR TERMINATED', 'live')).toBe('stopped')
+    expect(lifecycleFromStatus('LIVE AUDIO STOPPED — captions paused', 'live')).toBe('stopped')
+    expect(lifecycleFromStatus('SMOKE COMPLETE — captions verified', 'live')).toBe('stopped')
+  })
+
+  it('demotes to "stopped" on failure mid-live, "idle" on failure pre-live', () => {
+    expect(lifecycleFromStatus('G2 MIC FAILED — bridge unavailable', 'live')).toBe('stopped')
+    expect(lifecycleFromStatus('G2 MIC FAILED — bridge unavailable', 'idle')).toBe('idle')
+    expect(lifecycleFromStatus('BROWSER MIC DENIED — captions paused', 'live')).toBe('stopped')
+  })
+
+  it('preserves the previous lifecycle for unrecognized statuses', () => {
+    expect(lifecycleFromStatus('READY — starting caption check', 'idle')).toBe('idle')
+    expect(lifecycleFromStatus('READY — starting caption check', 'live')).toBe('live')
   })
 })

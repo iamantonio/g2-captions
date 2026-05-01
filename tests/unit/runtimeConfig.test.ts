@@ -4,6 +4,7 @@ import {
   getDefaultStreamingEndpoint,
   getDefaultTokenEndpoint,
   getSpeechFixtureUrl,
+  isDebugMode,
   shouldAutoRunHardwareSmoke,
 } from '../../src/app/runtimeConfig'
 
@@ -55,5 +56,12 @@ describe('runtime config for Hub hardware smoke tests', () => {
   it('does not auto-run outside the Even Hub bridge regardless of opt-in flag', () => {
     expect(shouldAutoRunHardwareSmoke(new URL('http://172.20.10.5:5173/'), false)).toBe(false)
     expect(shouldAutoRunHardwareSmoke(new URL('http://172.20.10.5:5173/?autoSmoke=1'), false)).toBe(false)
+  })
+
+  it('defaults to production UI; ?debug=1 opts into the developer panel', () => {
+    expect(isDebugMode(new URL('http://172.20.10.5:5173/'))).toBe(false)
+    expect(isDebugMode(new URL('http://172.20.10.5:5173/?debug=1'))).toBe(true)
+    expect(isDebugMode(new URL('http://172.20.10.5:5173/?debug=0'))).toBe(false)
+    expect(isDebugMode(new URL('http://172.20.10.5:5173/?debug=true'))).toBe(false)
   })
 })
