@@ -92,6 +92,16 @@ describe('token broker HTTP routes', () => {
       })
   })
 
+  it('still rejects "null" string Origin without a bearer (defense-in-depth for dev)', async () => {
+    await supertestRequest(handle.server)
+      .post('/deepgram/token')
+      .set('Origin', 'null')
+      .expect(403)
+      .expect((res) => {
+        expect(res.body).toEqual({ error: 'origin_not_allowed' })
+      })
+  })
+
   it('mints a Deepgram token when origin is loopback Vite', async () => {
     await supertestRequest(handle.server)
       .post('/deepgram/token')

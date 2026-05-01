@@ -168,6 +168,20 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
     response.setHeader('Vary', 'Origin')
     response.setHeader('Cache-Control', 'no-store')
 
+    // Trace every request entry so we can debug WebView reachability without
+    // having to instrument the upstream HTTP server. We log presence (not
+    // values) for the bearer header — never the token itself.
+    logger.info(
+      {
+        method: request.method,
+        url: request.url,
+        origin: origin ?? null,
+        hasBearer: bearerFromHeader(request) !== undefined,
+        loopback: isLoopback(request),
+      },
+      'http_request',
+    )
+
     // /healthz is intentionally exempt from origin gating AND bearer-auth so
     // external probes (curl, hardware-readiness script) can check liveness
     // without faking a browser Origin or knowing the broker auth token.
@@ -177,8 +191,19 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
       return
     }
 
-    // Origin filter — defense-in-depth for browser callers (Fix #35).
-    if (!isAllowedTokenBrokerOrigin(origin)) {
+    // Origin filter — still applies for loopback dev callers (defense-in-
+    // depth) and for any caller that doesn't present a valid bearer. The
+    // ONE case we relax is a non-loopback caller with a valid bearer: a
+    // packaged WebView .ehpk often reports Origin: null / capacitor:// /
+    // file:// because there's no real http document origin, but it has the
+    // right bearer baked in. The bearer is the real auth there, not the
+    // origin string.
+    const hasBearer = bearerFromHeader(request) !== undefined
+    const bearerOk = bearerCheckPasses(request)
+    const productionBearerPass = !isLoopback(request) && brokerAuthToken !== undefined && hasBearer && bearerOk
+
+    if (!productionBearerPass && !isAllowedTokenBrokerOrigin(origin)) {
+      logger.warn({ origin: origin ?? null, url: request.url }, 'http_origin_rejected')
       response.writeHead(403, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ error: 'origin_not_allowed' }))
       return
@@ -192,8 +217,8 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
       return
     }
 
-    // Bearer-token gate (Fix #34). Authoritative for non-loopback callers.
-    if (!bearerCheckPasses(request)) {
+    if (!bearerOk) {
+      logger.warn({ url: request.url, origin: origin ?? null }, 'http_bearer_rejected')
       response.writeHead(401, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ error: 'unauthorized' }))
       return
@@ -287,20 +312,45 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
   server.on('upgrade', (request, socket, head) => {
     const origin = request.headers.origin
     const pathname = new URL(request.url ?? '/', 'ws://localhost').pathname
+    const upgradeBearer = bearerFromUpgradeUrl(request.url)
+
+    logger.info(
+      {
+        pathname,
+        origin: origin ?? null,
+        hasBearerFromUrl: upgradeBearer !== undefined,
+        hasBearerFromHeader: bearerFromHeader(request) !== undefined,
+        loopback: isLoopback(request),
+      },
+      'ws_upgrade_request',
+    )
 
     if (pathname !== '/deepgram/listen') {
+      logger.warn({ pathname }, 'ws_upgrade_path_rejected')
       socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
       socket.destroy()
       return
     }
 
-    if (!isAllowedTokenBrokerOrigin(origin)) {
+    // Same auth posture as HTTP: bearer is the primary gate; origin gating
+    // applies for loopback / dev callers (defense-in-depth) and for callers
+    // without a bearer. A non-loopback caller with a valid bearer skips
+    // origin gating — that's how a packaged WebView .ehpk with Origin: null
+    // / capacitor:// / file:// connects.
+    const hasBearerForUpgrade = upgradeBearer !== undefined || bearerFromHeader(request) !== undefined
+    const bearerOk = bearerCheckPasses(request, upgradeBearer)
+    const productionBearerPass =
+      !isLoopback(request) && brokerAuthToken !== undefined && hasBearerForUpgrade && bearerOk
+
+    if (!productionBearerPass && !isAllowedTokenBrokerOrigin(origin)) {
+      logger.warn({ origin: origin ?? null }, 'ws_upgrade_origin_rejected')
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
       socket.destroy()
       return
     }
 
-    if (!bearerCheckPasses(request, bearerFromUpgradeUrl(request.url))) {
+    if (!bearerOk) {
+      logger.warn({ origin: origin ?? null }, 'ws_upgrade_bearer_rejected')
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
       socket.destroy()
       return
