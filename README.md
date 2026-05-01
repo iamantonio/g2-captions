@@ -96,12 +96,50 @@ This uses a controlled local PCM fixture, not live microphone or G2 audio.
 
 ## Packaging
 
+For a `.ehpk` that ships to a real device via the Even Hub portal, the WebView needs to know where to find the broker. Set `VITE_BROKER_BASE_URL` at build time:
+
 ```bash
-npm run build
+VITE_BROKER_BASE_URL=https://your-broker.fly.dev npm run build
 evenhub pack app.json dist -o g2-captions.ehpk
 ```
 
+For a local Vite dev session, omit the env var — `runtimeConfig.ts` falls back to deriving the broker URL from the LAN IP serving the app, which is what `npm run dev -- --host 0.0.0.0` already produces.
+
 Generated outputs (`dist/`, `*.ehpk`, `artifacts/`) are intentionally ignored.
+
+## Deploying the broker (Fly.io)
+
+The token broker (`tools/token-broker.ts`) is a small Node service that gates the Deepgram + AssemblyAI credentials and proxies the Deepgram WebSocket. For dev, it runs on your Mac on `127.0.0.1:8787`. For shipping, deploy it to Fly.io so an installed `.ehpk` can reach it from anywhere.
+
+First-time setup:
+
+```bash
+# 1. Install flyctl (https://fly.io/docs/hands-on/install-flyctl/) and sign in.
+fly auth login
+
+# 2. Create the app. Pick a name or let Fly generate one.
+fly apps create g2-captions-broker
+# Edit fly.toml to uncomment `app = "g2-captions-broker"` so subsequent
+# `fly deploy` invocations target the right app without -a.
+
+# 3. Set the credential secrets (read from your local .env).
+fly secrets set DEEPGRAM_API_KEY="$(grep '^DEEPGRAM_API_KEY=' .env | cut -d= -f2-)"
+fly secrets set VITE_BROKER_AUTH_TOKEN="$(grep '^VITE_BROKER_AUTH_TOKEN=' .env | cut -d= -f2-)"
+# Optional, only if you use the AssemblyAI seam:
+fly secrets set ASSEMBLYAI_API_KEY="$(grep '^ASSEMBLYAI_API_KEY=' .env | cut -d= -f2-)"
+
+# 4. Deploy.
+fly deploy
+
+# 5. Verify the deployed broker answers /healthz with 200 {ok:true}.
+curl -fsS https://g2-captions-broker.fly.dev/healthz
+```
+
+Subsequent deploys are just `fly deploy`. Logs stream with `fly logs`.
+
+After the broker is up, rebuild the `.ehpk` with `VITE_BROKER_BASE_URL` set to the Fly URL (see Packaging above), upload it via the Even Hub portal at `hub.evenrealities.com/hub`, and the next launch on G2 will reach the deployed broker instead of `127.0.0.1`.
+
+The bearer token (`VITE_BROKER_AUTH_TOKEN`) is now baked into every shipped `.ehpk` — anyone who installs it can extract it from the bundle. The broker's per-IP rate limit (10 token mints/min) is the only abuse cap. For a real ship to users you don't know, plan to layer real per-user auth and tighter caps before opening distribution.
 
 ## Documentation
 

@@ -150,3 +150,26 @@ Pending actions:
 
 - Hardware-smoke the new production UI on real G2 to confirm: (a) the single Start button kicks off the G2 SDK audio path and the lens shows live captions, (b) the lens surface is unaffected (production-mode root produces the same frame text via `formatCaptionFrame`).
 - `?autoSmoke=1` continues to work in production mode for hardware QR launches; verify next run.
+
+### D-0010 — Broker hosting: Fly.io
+
+Status: Approved by direction, 2026-05-01
+Decision: **Deploy `tools/token-broker.ts` as a containerized Fly.io app for production `.ehpk` distribution. The dev-time loopback flow stays available for local work; the WebView picks the deployed broker over a build-time `VITE_BROKER_BASE_URL`.**
+
+Rationale:
+
+- The `.ehpk` installed via the Even Hub portal (`hub.evenrealities.com/hub`) has no LAN context — `runtimeConfig.ts` was deriving the broker URL from `locationUrl.hostname` and falling back to `127.0.0.1:8787`, which is the phone's loopback and has nothing listening. Symptom: lens shows `ASR TOKEN FAILED — check broker` on every Start.
+- Fly.io was chosen over alternatives because it preserves the entire current broker architecture (long-lived WebSocket proxy, Pino logging, rate limits, bearer auth, Wave 2 fix #36 server-side parameter control). Cloudflare Workers would require rewriting the WS proxy on Durable Objects; Vercel would require dropping the proxy and shifting to direct-browser → Deepgram (loses fix #36). Fly.io is also generous enough on the free tier for an alpha audience.
+- Build-time override (`VITE_BROKER_BASE_URL=https://...`) keeps local dev frictionless: unset → LAN-derived URLs (current behavior); set → production broker URL. WebView fetches and the WS upgrade both honor the override; manifest whitelist must list the deployed origin.
+
+Tradeoffs / known limits:
+
+- The bearer token (`VITE_BROKER_AUTH_TOKEN`) is now baked into every shipped bundle. Anyone with the `.ehpk` can extract it. This means the bearer is no longer a true secret — it's an "installed-user" gate, no stronger than what's on disk. The per-IP rate limiter (`rate-limiter-flexible`, 10 token mints/min) is the only abuse cap today.
+- For a real ship to users beyond a known alpha list, layer real per-user authentication on top (OAuth / Sign-in-with-X) and tighter per-user minute caps on Deepgram streaming time. Until that lands, monitor Fly bandwidth + Deepgram billing closely.
+- Deepgram streaming bills by minute. A leaked bundle = open bill. Set Deepgram's project-level usage cap as a hard ceiling.
+
+Pending actions:
+
+- Tony: `fly auth login`, `fly apps create <name>`, `fly secrets set ...` (DEEPGRAM_API_KEY, VITE_BROKER_AUTH_TOKEN), `fly deploy`.
+- After deploy: rebuild `.ehpk` with `VITE_BROKER_BASE_URL=https://<app>.fly.dev npm run build`, re-upload to Even Hub portal, hardware-smoke verify.
+- Update `app.json` `permissions[].whitelist` to include the chosen Fly hostname (currently only `https://api.deepgram.com` is listed; whitelist was found permissive for LAN/loopback per D-0008-adjacent spike but a production HTTPS origin should be explicit).

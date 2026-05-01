@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   getClientLogEndpoint,
   getDefaultStreamingEndpoint,
@@ -63,5 +63,40 @@ describe('runtime config for Hub hardware smoke tests', () => {
     expect(isDebugMode(new URL('http://172.20.10.5:5173/?debug=1'))).toBe(true)
     expect(isDebugMode(new URL('http://172.20.10.5:5173/?debug=0'))).toBe(false)
     expect(isDebugMode(new URL('http://172.20.10.5:5173/?debug=true'))).toBe(false)
+  })
+})
+
+describe('runtime config with VITE_BROKER_BASE_URL override', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('points the token, streaming, and client-log endpoints at the deployed broker when set', () => {
+    vi.stubEnv('VITE_BROKER_BASE_URL', 'https://g2-captions.fly.dev')
+
+    expect(getDefaultTokenEndpoint(new URL('http://anything-irrelevant/'))).toBe(
+      'https://g2-captions.fly.dev/deepgram/token',
+    )
+    expect(getDefaultStreamingEndpoint(new URL('http://anything-irrelevant/'))).toBe(
+      'wss://g2-captions.fly.dev/deepgram/listen',
+    )
+    expect(getClientLogEndpoint(new URL('http://anything-irrelevant/'))).toBe('https://g2-captions.fly.dev/client-log')
+  })
+
+  it('downgrades wss → ws when the base URL is plain http (local-dev override)', () => {
+    vi.stubEnv('VITE_BROKER_BASE_URL', 'http://local-broker.test:9000')
+    expect(getDefaultStreamingEndpoint(new URL('http://anything/'))).toBe('ws://local-broker.test:9000/deepgram/listen')
+  })
+
+  it('falls back to LAN-derived URLs when the override is empty or whitespace', () => {
+    vi.stubEnv('VITE_BROKER_BASE_URL', '')
+    expect(getDefaultTokenEndpoint(new URL('http://172.20.10.5:5173/'))).toBe('http://172.20.10.5:8787/deepgram/token')
+    vi.stubEnv('VITE_BROKER_BASE_URL', '   ')
+    expect(getDefaultTokenEndpoint(new URL('http://172.20.10.5:5173/'))).toBe('http://172.20.10.5:8787/deepgram/token')
+  })
+
+  it('falls back to LAN-derived URLs when the override is not a parseable URL', () => {
+    vi.stubEnv('VITE_BROKER_BASE_URL', 'not a url')
+    expect(getDefaultTokenEndpoint(new URL('http://172.20.10.5:5173/'))).toBe('http://172.20.10.5:8787/deepgram/token')
   })
 })

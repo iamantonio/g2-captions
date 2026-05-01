@@ -1,0 +1,46 @@
+# Fly.io config for the g2-captions token broker.
+# Fill in `app = ...` after `fly launch`; that command reads this file
+# and writes back the generated app name. Leave the rest as-is unless you
+# move regions or change the internal port.
+
+# app = "your-broker-app-name"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Internal port the container listens on. Matches Dockerfile's
+# TOKEN_BROKER_PORT default. Fly's edge terminates TLS on 443 and
+# proxies to this port over HTTP/1.1 (with WS upgrade support).
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Keep one instance always running so cold-start latency doesn't add to
+  # token fetches. Set to 0 if you want pure scale-to-zero.
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/healthz"
+
+# Smallest VM size that comfortably handles the broker's footprint.
+# Pino + ws + http are all very light. Bump if active concurrent
+# WebSocket sessions exceed ~50 per machine.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+[env]
+  # NODE_ENV is set in the Dockerfile; everything else (DEEPGRAM_API_KEY,
+  # ASSEMBLYAI_API_KEY, VITE_BROKER_AUTH_TOKEN) MUST be set as Fly
+  # secrets, not env values. Run:
+  #   fly secrets set DEEPGRAM_API_KEY=...
+  #   fly secrets set VITE_BROKER_AUTH_TOKEN=...
+  # See README → "Deploying the broker" for the full sequence.

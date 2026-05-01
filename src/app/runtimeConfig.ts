@@ -5,16 +5,46 @@ function resolveBrokerHost(locationUrl: URL): string {
   return host === 'localhost' ? '127.0.0.1' : host
 }
 
+/**
+ * Reads a build-time-injected base URL for the deployed broker. When set,
+ * overrides the LAN-derived URLs returned by the helpers below — required
+ * for production .ehpk distribution where the WebView has no LAN context.
+ *
+ * Set via `VITE_BROKER_BASE_URL=https://<host>` at build time. Examples:
+ *   VITE_BROKER_BASE_URL=https://g2-captions.fly.dev npm run build
+ *   VITE_BROKER_BASE_URL=https://broker.example.com npm run build
+ *
+ * Unset → fall back to LAN-derived URLs (current dev-time behavior).
+ */
+function getBrokerBaseUrl(): URL | undefined {
+  const value = import.meta.env?.VITE_BROKER_BASE_URL
+  if (typeof value !== 'string' || !value.trim()) return undefined
+  try {
+    return new URL(value.trim())
+  } catch {
+    return undefined
+  }
+}
+
 export function getDefaultTokenEndpoint(locationUrl: URL): string {
+  const base = getBrokerBaseUrl()
+  if (base) return new URL('/deepgram/token', base).toString()
   return `${locationUrl.protocol}//${resolveBrokerHost(locationUrl)}:${TOKEN_BROKER_PORT}/deepgram/token`
 }
 
 export function getDefaultStreamingEndpoint(locationUrl: URL): string {
+  const base = getBrokerBaseUrl()
+  if (base) {
+    const wsProtocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${wsProtocol}//${base.host}/deepgram/listen`
+  }
   const protocol = locationUrl.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${resolveBrokerHost(locationUrl)}:${TOKEN_BROKER_PORT}/deepgram/listen`
 }
 
 export function getClientLogEndpoint(locationUrl: URL): string {
+  const base = getBrokerBaseUrl()
+  if (base) return new URL('/client-log', base).toString()
   return `${locationUrl.protocol}//${resolveBrokerHost(locationUrl)}:${TOKEN_BROKER_PORT}/client-log`
 }
 
