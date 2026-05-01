@@ -31,11 +31,12 @@ describe('AssemblyAiLiveSession', () => {
     FakeWebSocket.instances = []
     const onTranscript = vi.fn()
     const onVisualStatus = vi.fn()
-    const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     )
 
     const session = new AssemblyAiLiveSession({
@@ -52,7 +53,9 @@ describe('AssemblyAiLiveSession', () => {
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:8787/assemblyai/token', { method: 'POST' })
     expect(FakeWebSocket.instances).toHaveLength(1)
     expect(FakeWebSocket.instances[0].url).toContain('token=temp-token')
-    expect(new URL(FakeWebSocket.instances[0].url).searchParams.get('keyterms_prompt')).toBe(JSON.stringify(['ProvenMachine']))
+    expect(new URL(FakeWebSocket.instances[0].url).searchParams.get('keyterms_prompt')).toBe(
+      JSON.stringify(['ProvenMachine']),
+    )
     expect(onVisualStatus).toHaveBeenCalledWith('CONNECTING — token')
     expect(onVisualStatus).toHaveBeenCalledWith('CONNECTING — ASR')
     expect(onVisualStatus).toHaveBeenCalledWith('ASR CONNECTED — waiting audio')
@@ -75,11 +78,12 @@ describe('AssemblyAiLiveSession', () => {
     const onVisualStatus = vi.fn()
     const session = new AssemblyAiLiveSession({
       tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
-      fetchImpl: vi.fn(async () =>
-        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
       ),
       WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
       onTranscript: vi.fn(),
@@ -115,11 +119,12 @@ describe('AssemblyAiLiveSession', () => {
     const onVisualStatus = vi.fn()
     const session = new AssemblyAiLiveSession({
       tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
-      fetchImpl: vi.fn(async () =>
-        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
       ),
       WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
       nowMs: () => 100,
@@ -138,11 +143,12 @@ describe('AssemblyAiLiveSession', () => {
     const sleep = vi.fn(async () => undefined)
     const session = new AssemblyAiLiveSession({
       tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
-      fetchImpl: vi.fn(async () =>
-        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
       ),
       WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
       onTranscript: vi.fn(),
@@ -164,11 +170,12 @@ describe('AssemblyAiLiveSession', () => {
     const nowValues = [1000, 1010, 1100, 1200, 1300]
     const session = new AssemblyAiLiveSession({
       tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
-      fetchImpl: vi.fn(async () =>
-        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
       ),
       WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
       nowMs: () => nowValues.shift() ?? 9999,

@@ -2,51 +2,51 @@
 
 ## Summary
 
-| #  | Title | Wave | Severity | Effort | Risk | Depends on |
-|----|-------|------|----------|--------|------|------------|
-| 1  | Add LICENSE file and `package.json` license field | Quick Win | Medium | S | Low | — |
-| 2  | Add `DEEPGRAM_API_KEY` to `.env.example` | Quick Win | Medium | S | Low | — |
-| 3  | Create `CHANGELOG.md` | Quick Win | Low | S | Low | — |
-| 4  | Add `npm run clean` script for `*.ehpk` artifact | Quick Win | Low | S | Low | — |
-| 5  | Document `inputGain = 4` magic number | Quick Win | Low | S | Low | — |
-| 6  | Decouple footer formatter from dash-replace step | Quick Win | Low | S | Low | — |
-| 7  | Fix `G2LensDisplay.render` startup-content edge case | Quick Win | Low | S | Low | — |
-| 8  | Fix `formatSpeakerChip` non-A/B speaker collision | Quick Win | Low | S | Low | — |
-| 9  | Add overlap-protection to vocabulary corrector | Quick Win | Low | S | Low | — |
-| 10 | Use `Buffer.concat` in `readJsonBody` | Quick Win | Low | S | Low | — |
-| 11 | Extract host-resolution helper in `runtimeConfig` | Quick Win | Low | S | Low | — |
-| 12 | Composite key for `CaptionState` segment ID | Quick Win | Medium | S | Low | — |
-| 13 | Cache compiled regex in vocab corrector | Quick Win | Low | S | Low | — |
-| 14 | Cap pending-message buffer in WS proxy | Quick Win | Low | S | Low | — |
-| 15 | Memoize telemetry summary | Quick Win | Low | S | Low | — |
-| 16 | Validate `TOKEN_BROKER_PORT` parse | Quick Win | Low | S | Low | — |
-| 17 | Replace `validateAssemblyAiToken` regex with real key shape | Quick Win | Medium | S | Low | — |
-| 18 | Reconcile manifest network whitelist (spike) | Quick Win | Low | S | Low | — |
-| 19 | Flip auto-smoke default to opt-in | Quick Win | Medium | S | Low | — |
-| 20 | Add Dependabot config | Quick Win | Low | S | Low | — |
-| 21 | Document Even Hub SDK pinning policy | Quick Win | Low | S | Low | — |
-| 22 | Parametric `VisualStatusKind` integration tests | Quick Win | Medium | S | Low | — |
-| 23 | Add ESLint flat config + Prettier + coverage + `audit-ci` to CI | Structural | Medium | M | Low | — |
-| 24 | Add pre-commit hook (husky + lint-staged) | Structural | Low | S | Low | #23 |
-| 25 | Add token broker integration tests (`superwstest`) | Structural | High | M | Low | — |
-| 26 | Adopt Pino structured logging | Structural | Medium | M | Low | — |
-| 27 | Bind catch errors and log with structured logger | Structural | Medium | M | Low | #26 |
-| 28 | Add `GET /healthz` endpoint | Structural | Medium | S | Low | #26 |
-| 29 | Add `uncaughtException` / `unhandledRejection` handlers | Structural | Medium | S | Low | #26 |
-| 30 | Add `SIGINT`/`SIGTERM` graceful shutdown | Structural | Low | S | Low | #29 |
-| 31 | Validate `/client-log` payloads | Structural | Low | S | Low | #26 |
-| 32 | Rate limit token endpoints | Structural | Low | S | Low | — |
-| 33 | Rename token broker files to vendor-neutral | Structural | Medium | M | Low | — |
-| 34 | Pre-shared bearer token between WebView and broker | Structural | High | M | Med | #25 |
-| 35 | Origin defense-in-depth alongside bearer token | Structural | Medium | S | Low | #34 |
-| 36 | Server-side fixed parameter set in Deepgram proxy | Structural | High | S | Low | #25 |
-| 37 | Refactor `main.ts` into discrete modules | Long-Term | Medium | L | Med | #25, #26 |
-| 38 | Add unit tests for refactored entry-point modules | Long-Term | High | M | Low | #37 |
-| 39 | Strategy pattern for `LiveAsrSession` (vendor adapter) | Long-Term | Medium | L | Med | #25 |
-| 40 | Extract shared ASR parse helpers | Long-Term | Medium | S | Low | #39 |
-| 41 | Debounce partials / immediate finals (BLE rate cap) | Long-Term | Medium | M | Med | #37 |
-| 42 | Cache `CaptionState.segments()` snapshot | Long-Term | Low | S | Low | #41 |
-| 43 | Migrate browser microphone to `AudioWorkletNode` | Long-Term | Low | L | Med | — |
+| #   | Title                                                           | Wave       | Severity | Effort | Risk | Depends on |
+| --- | --------------------------------------------------------------- | ---------- | -------- | ------ | ---- | ---------- |
+| 1   | Add LICENSE file and `package.json` license field               | Quick Win  | Medium   | S      | Low  | —          |
+| 2   | Add `DEEPGRAM_API_KEY` to `.env.example`                        | Quick Win  | Medium   | S      | Low  | —          |
+| 3   | Create `CHANGELOG.md`                                           | Quick Win  | Low      | S      | Low  | —          |
+| 4   | Add `npm run clean` script for `*.ehpk` artifact                | Quick Win  | Low      | S      | Low  | —          |
+| 5   | Document `inputGain = 4` magic number                           | Quick Win  | Low      | S      | Low  | —          |
+| 6   | Decouple footer formatter from dash-replace step                | Quick Win  | Low      | S      | Low  | —          |
+| 7   | Fix `G2LensDisplay.render` startup-content edge case            | Quick Win  | Low      | S      | Low  | —          |
+| 8   | Fix `formatSpeakerChip` non-A/B speaker collision               | Quick Win  | Low      | S      | Low  | —          |
+| 9   | Add overlap-protection to vocabulary corrector                  | Quick Win  | Low      | S      | Low  | —          |
+| 10  | Use `Buffer.concat` in `readJsonBody`                           | Quick Win  | Low      | S      | Low  | —          |
+| 11  | Extract host-resolution helper in `runtimeConfig`               | Quick Win  | Low      | S      | Low  | —          |
+| 12  | Composite key for `CaptionState` segment ID                     | Quick Win  | Medium   | S      | Low  | —          |
+| 13  | Cache compiled regex in vocab corrector                         | Quick Win  | Low      | S      | Low  | —          |
+| 14  | Cap pending-message buffer in WS proxy                          | Quick Win  | Low      | S      | Low  | —          |
+| 15  | Memoize telemetry summary                                       | Quick Win  | Low      | S      | Low  | —          |
+| 16  | Validate `TOKEN_BROKER_PORT` parse                              | Quick Win  | Low      | S      | Low  | —          |
+| 17  | Replace `validateAssemblyAiToken` regex with real key shape     | Quick Win  | Medium   | S      | Low  | —          |
+| 18  | Reconcile manifest network whitelist (spike)                    | Quick Win  | Low      | S      | Low  | —          |
+| 19  | Flip auto-smoke default to opt-in                               | Quick Win  | Medium   | S      | Low  | —          |
+| 20  | Add Dependabot config                                           | Quick Win  | Low      | S      | Low  | —          |
+| 21  | Document Even Hub SDK pinning policy                            | Quick Win  | Low      | S      | Low  | —          |
+| 22  | Parametric `VisualStatusKind` integration tests                 | Quick Win  | Medium   | S      | Low  | —          |
+| 23  | Add ESLint flat config + Prettier + coverage + `audit-ci` to CI | Structural | Medium   | M      | Low  | —          |
+| 24  | Add pre-commit hook (husky + lint-staged)                       | Structural | Low      | S      | Low  | #23        |
+| 25  | Add token broker integration tests (`superwstest`)              | Structural | High     | M      | Low  | —          |
+| 26  | Adopt Pino structured logging                                   | Structural | Medium   | M      | Low  | —          |
+| 27  | Bind catch errors and log with structured logger                | Structural | Medium   | M      | Low  | #26        |
+| 28  | Add `GET /healthz` endpoint                                     | Structural | Medium   | S      | Low  | #26        |
+| 29  | Add `uncaughtException` / `unhandledRejection` handlers         | Structural | Medium   | S      | Low  | #26        |
+| 30  | Add `SIGINT`/`SIGTERM` graceful shutdown                        | Structural | Low      | S      | Low  | #29        |
+| 31  | Validate `/client-log` payloads                                 | Structural | Low      | S      | Low  | #26        |
+| 32  | Rate limit token endpoints                                      | Structural | Low      | S      | Low  | —          |
+| 33  | Rename token broker files to vendor-neutral                     | Structural | Medium   | M      | Low  | —          |
+| 34  | Pre-shared bearer token between WebView and broker              | Structural | High     | M      | Med  | #25        |
+| 35  | Origin defense-in-depth alongside bearer token                  | Structural | Medium   | S      | Low  | #34        |
+| 36  | Server-side fixed parameter set in Deepgram proxy               | Structural | High     | S      | Low  | #25        |
+| 37  | Refactor `main.ts` into discrete modules                        | Long-Term  | Medium   | L      | Med  | #25, #26   |
+| 38  | Add unit tests for refactored entry-point modules               | Long-Term  | High     | M      | Low  | #37        |
+| 39  | Strategy pattern for `LiveAsrSession` (vendor adapter)          | Long-Term  | Medium   | L      | Med  | #25        |
+| 40  | Extract shared ASR parse helpers                                | Long-Term  | Medium   | S      | Low  | #39        |
+| 41  | Debounce partials / immediate finals (BLE rate cap)             | Long-Term  | Medium   | M      | Med  | #37        |
+| 42  | Cache `CaptionState.segments()` snapshot                        | Long-Term  | Low      | S      | Low  | #41        |
+| 43  | Migrate browser microphone to `AudioWorkletNode`                | Long-Term  | Low      | L      | Med  | —          |
 
 ---
 
@@ -55,6 +55,7 @@
 **Rationale:** All 22 fixes here are low-risk, ship-in-isolation, and individually under two hours. They include doc/config additions (LICENSE, CHANGELOG, Dependabot), trivial bug fixes (footer regex coupling, speaker chip collision, broker port validation), tiny targeted patches to standalone modules (composite keys, buffer concat, host helper extraction), and the `auto-smoke` default flip — which closes a documented non-negotiable. None of these depend on the broker's auth/observability redesign or the entry-point refactor in later waves, so they can be merged in any order. Because they're individually inexpensive and combined are very high-value, this wave is the right place to retire the long Low-severity tail before structural work begins.
 
 ### Fix #1 — Add LICENSE file and `package.json` license field
+
 - **Source:** AUDIT.md → Dependencies & tech debt → D-1
 - **Severity:** Medium
 - **Files affected:** new `LICENSE` (root), `package.json`, optional `README.md` license section
@@ -65,6 +66,7 @@
 - **Verification:** `cat LICENSE` shows full text; `node -e "console.log(require('./package.json').license)"` returns the chosen string; `npm pack --dry-run` no longer warns about missing license.
 
 ### Fix #2 — Add `DEEPGRAM_API_KEY` to `.env.example`
+
 - **Source:** AUDIT.md → Security & secrets handling → S-6
 - **Severity:** Medium
 - **Files affected:** `.env.example`
@@ -75,6 +77,7 @@
 - **Verification:** Fresh setup walkthrough: `cp .env.example .env`, fill in real values, run `npm run token-broker` — broker boots without a `DEEPGRAM_API_KEY must be set` error.
 
 ### Fix #3 — Create `CHANGELOG.md`
+
 - **Source:** AUDIT.md → Dependencies & tech debt → D-3
 - **Severity:** Low
 - **Files affected:** new `CHANGELOG.md` (root)
@@ -85,6 +88,7 @@
 - **Verification:** `head -30 CHANGELOG.md` shows the standard structure; `git log --oneline` commits map to the documented entries.
 
 ### Fix #4 — Add `npm run clean` script for `*.ehpk` artifact
+
 - **Source:** AUDIT.md → Dependencies & tech debt → D-5
 - **Severity:** Low
 - **Files affected:** `package.json`
@@ -95,6 +99,7 @@
 - **Verification:** `npm run build && evenhub pack ...` produces an ehpk; `npm run clean` removes it; `git status` is clean afterwards.
 
 ### Fix #5 — Document `inputGain = 4` magic number
+
 - **Source:** AUDIT.md → Architecture & code quality → A-9
 - **Severity:** Low
 - **Files affected:** `src/audio/g2SdkAudio.ts:78`
@@ -105,6 +110,7 @@
 - **Verification:** `npm test` still passes (no behavior change); the constant appears in the file and a code reviewer can trace why `4` was picked.
 
 ### Fix #6 — Decouple footer formatter from dash-replace step
+
 - **Source:** AUDIT.md → Architecture & code quality → A-10
 - **Severity:** Low
 - **Files affected:** `src/captions/formatter.ts:48-65`
@@ -115,6 +121,7 @@
 - **Verification:** Add a unit test that passes an em-dash status (`'CONNECTING — token'`) and asserts the same footer label as the ASCII-dash form.
 
 ### Fix #7 — Fix `G2LensDisplay.render` startup-content edge case
+
 - **Source:** AUDIT.md → Architecture & code quality → A-11
 - **Severity:** Low
 - **Files affected:** `src/display/g2LensDisplay.ts:67-74`
@@ -125,6 +132,7 @@
 - **Verification:** Add a `tests/unit/g2LensDisplay.test.ts` case that calls `render(G2_STARTUP_CONTENT)` after startup and asserts the upgrade path (not the no-op path) executed.
 
 ### Fix #8 — Fix `formatSpeakerChip` non-A/B speaker collision
+
 - **Source:** AUDIT.md → Architecture & code quality → A-7
 - **Severity:** Low
 - **Files affected:** `src/captions/formatter.ts:120-127`
@@ -135,6 +143,7 @@
 - **Verification:** Parametric test in `tests/unit/formatter.test.ts` covers all six listed cases and asserts chip uniqueness across the set.
 
 ### Fix #9 — Add overlap-protection to vocabulary corrector
+
 - **Source:** AUDIT.md → Architecture & code quality → A-12
 - **Severity:** Low
 - **Files affected:** `src/vocab/corrector.ts:8-23`
@@ -145,6 +154,7 @@
 - **Verification:** Add a unit test with two vocabulary entries where the higher-priority canonical contains the lower-priority alias as a substring; assert no double correction.
 
 ### Fix #10 — Use `Buffer.concat` in `readJsonBody`
+
 - **Source:** AUDIT.md → Architecture & code quality → A-13
 - **Severity:** Low
 - **Files affected:** `tools/assemblyai-token-broker.ts:14-21`
@@ -155,6 +165,7 @@
 - **Verification:** Add an integration test (rolls into Fix #25) that POSTs a multi-chunk JSON body containing non-ASCII characters (`ä`, `é`, `中`); body parses correctly.
 
 ### Fix #11 — Extract host-resolution helper in `runtimeConfig`
+
 - **Source:** AUDIT.md → Architecture & code quality → A-5
 - **Severity:** Low
 - **Files affected:** `src/app/runtimeConfig.ts:1-22`
@@ -165,6 +176,7 @@
 - **Verification:** `tests/unit/runtimeConfig.test.ts` continues to pass; new test asserts the three callers all return endpoints with the same host part.
 
 ### Fix #12 — Composite key for `CaptionState` segment ID
+
 - **Source:** AUDIT.md → Architecture & code quality → A-6
 - **Severity:** Medium
 - **Files affected:** `src/captions/CaptionState.ts:8-26`
@@ -175,6 +187,7 @@
 - **Verification:** Add a unit test with two events sharing `startMs=0` but different speakers (`A`, `B`) — assert `state.segments()` returns two distinct segments after both events apply.
 
 ### Fix #13 — Cache compiled regex in vocab corrector
+
 - **Source:** AUDIT.md → Performance & scalability → P-3
 - **Severity:** Low
 - **Files affected:** `src/vocab/corrector.ts:8-23`
@@ -185,6 +198,7 @@
 - **Verification:** Add a microbenchmark assertion (or just an `expect.toBeLessThan`) showing the second call is at least 10× faster than the first.
 
 ### Fix #14 — Cap pending-message buffer in WS proxy
+
 - **Source:** AUDIT.md → Performance & scalability → P-4
 - **Severity:** Low
 - **Files affected:** `tools/assemblyai-token-broker.ts:120-150`
@@ -195,6 +209,7 @@
 - **Verification:** Integration test (rolls into Fix #25) that opens the proxy, blocks the upstream `ws.Server` from accepting, sends > 1 MB of audio frames, asserts the browser side receives a 1011 close.
 
 ### Fix #15 — Memoize telemetry summary
+
 - **Source:** AUDIT.md → Performance & scalability → P-5
 - **Severity:** Low
 - **Files affected:** `src/captions/latency.ts:91-108, 110-134`
@@ -205,6 +220,7 @@
 - **Verification:** Unit test asserts that two consecutive `report()` calls without intervening `mark()` return reference-equal objects.
 
 ### Fix #16 — Validate `TOKEN_BROKER_PORT` parse
+
 - **Source:** AUDIT.md → Observability & error handling → O-7
 - **Severity:** Low
 - **Files affected:** `tools/assemblyai-token-broker.ts:8`
@@ -215,6 +231,7 @@
 - **Verification:** Manual: `ASSEMBLYAI_TOKEN_BROKER_PORT=abc npm run token-broker` exits with the friendly error message instead of a `RangeError` from `server.listen`.
 
 ### Fix #17 — Replace `validateAssemblyAiToken` regex with real key shape
+
 - **Source:** AUDIT.md → Security & secrets handling → S-5
 - **Severity:** Medium
 - **Files affected:** `src/asr/AssemblyAiStreamingClient.ts:39-45`
@@ -225,6 +242,7 @@
 - **Verification:** Unit test that asserts a 32-char hex value (no real key value committed; use a synthesized example) is rejected for AssemblyAI; a non-JWT-shaped value is rejected for Deepgram.
 
 ### Fix #18 — Reconcile manifest network whitelist (spike)
+
 - **Source:** AUDIT.md → Security & secrets handling → S-7
 - **Severity:** Low
 - **Files affected:** `app.json`, `tests/integration/manifestPermissions.test.ts`
@@ -235,6 +253,7 @@
 - **Verification:** Spike memo (added to `docs/12-manifest-whitelist-spike.md` next phase number) documents the finding; manifest test asserts whatever the new agreed shape is.
 
 ### Fix #19 — Flip auto-smoke default to opt-in
+
 - **Source:** AUDIT.md → Security & secrets handling → S-8
 - **Severity:** Medium
 - **Files affected:** `src/app/runtimeConfig.ts:24-27`, `src/app/main.ts:48-51`
@@ -245,6 +264,7 @@
 - **Verification:** `tests/unit/runtimeConfig.test.ts` adds two cases: `?autoSmoke=1` returns true, missing flag returns false even when `hasEvenBridge=true`.
 
 ### Fix #20 — Add Dependabot config
+
 - **Source:** AUDIT.md → Dependencies & tech debt → D-4
 - **Severity:** Low
 - **Files affected:** new `.github/dependabot.yml`
@@ -255,6 +275,7 @@
 - **Verification:** `gh api repos/iamantonio/g2-captions/dependabot/secrets` (or the GitHub UI) confirms the config is parsed; first weekly run produces a PR within seven days.
 
 ### Fix #21 — Document Even Hub SDK pinning policy
+
 - **Source:** AUDIT.md → Dependencies & tech debt → D-2
 - **Severity:** Low
 - **Files affected:** `DECISIONS.md`, `package.json`
@@ -265,6 +286,7 @@
 - **Verification:** `DECISIONS.md` contains D-0007 with status, rationale, and policy.
 
 ### Fix #22 — Parametric `VisualStatusKind` integration tests
+
 - **Source:** AUDIT.md → Test coverage & CI/CD → T-3
 - **Severity:** Medium
 - **Files affected:** `src/types.ts`, `tests/integration/accessibilityFallback.test.ts`
@@ -281,6 +303,7 @@
 **Rationale:** This wave addresses root causes that touch the broker, the CI pipeline, and the project's auth/observability backbone. Fix #25 (broker integration tests) lands first inside the wave because it is the verification mechanism for the security and observability changes that follow (Fixes #34, #35, #36, and the entire #26-#31 logger/health/handlers chain). Fix #26 (Pino logger) is the cross-cutting prerequisite for #27, #28, #29, #31. Fix #34 (bearer token) unblocks #35 (Origin defense-in-depth). Lint/format/audit (Fix #23) lands early so subsequent code in this wave runs under the lint contract. None of these changes are large enough to be Long-Term, but they are too coordinated for Wave 1.
 
 ### Fix #23 — Add ESLint flat config + Prettier + coverage + `audit-ci` to CI
+
 - **Source:** AUDIT.md → Test coverage & CI/CD → T-4
 - **Severity:** Medium
 - **Files affected:** new `eslint.config.mjs`, new `.prettierrc.json`, `package.json` (devDeps + scripts), `.github/workflows/ci.yml`, `vite.config.ts` (coverage config)
@@ -291,6 +314,7 @@
 - **Verification:** CI workflow shows four green jobs (test, build, lint, audit); `npm run test:coverage` outputs a coverage table; `npm run lint` exits 0 on the codebase.
 
 ### Fix #24 — Add pre-commit hook (husky + lint-staged)
+
 - **Source:** AUDIT.md → Test coverage & CI/CD → T-5
 - **Severity:** Low
 - **Files affected:** new `.husky/pre-commit`, `package.json` (devDeps + `lint-staged` config)
@@ -301,6 +325,7 @@
 - **Verification:** Stage a deliberately badly-formatted change, run `git commit` — hook reformats or rejects.
 
 ### Fix #25 — Add token broker integration tests (`superwstest`)
+
 - **Source:** AUDIT.md → Test coverage & CI/CD → T-2
 - **Severity:** High
 - **Files affected:** new `tests/integration/tokenBroker.test.ts`, `package.json` (devDeps), possibly `tools/assemblyai-token-broker.ts` (extract a `createTokenBrokerServer({deps}): http.Server` factory function so tests can start it on an OS-assigned port without invoking the file as a script)
@@ -311,6 +336,7 @@
 - **Verification:** New test file passes; covers happy path + the four broker routes + WS proxy upgrade + close coordination + body-parse non-ASCII (rolls in Fix #10's verification) + buffer cap (Fix #14).
 
 ### Fix #26 — Adopt Pino structured logging
+
 - **Source:** AUDIT.md → Observability & error handling → O-2
 - **Severity:** Medium
 - **Files affected:** new `src/observability/logger.ts` (or similar), `tools/assemblyai-token-broker.ts`, `tools/run-fixture-prototype.ts`, `tools/run-fixture-benchmark.ts`, `tools/run-hardware-readiness.ts`, `src/app/main.ts` (browser path keeps `console.info` but with structured payload to `/client-log`), `package.json` (deps)
@@ -321,6 +347,7 @@
 - **Verification:** Run broker, observe NDJSON output with `level`, `time`, `pid`, `msg` fields; broker tests (Fix #25) assert log lines match expected JSON shape on key events.
 
 ### Fix #27 — Bind catch errors and log with structured logger
+
 - **Source:** AUDIT.md → Observability & error handling → O-1
 - **Severity:** Medium
 - **Files affected:** all sites cited in AUDIT.md O-1: `src/asr/AssemblyAiLiveSession.ts:159-161`, `src/asr/DeepgramLiveSession.ts:162-164`, `src/app/main.ts:216-218,230-232,238-240,323-326`, `src/audio/browserMicrophone.ts:36-39`, `tools/assemblyai-token-broker.ts:51-54,69-72,86-89`
@@ -331,6 +358,7 @@
 - **Verification:** Trigger a known failure (e.g., bad token endpoint URL) — broker logs include the original `err.message` and stack at level `error`; visual status still surfaces.
 
 ### Fix #28 — Add `GET /healthz` endpoint
+
 - **Source:** AUDIT.md → Observability & error handling → O-3
 - **Severity:** Medium
 - **Files affected:** `tools/assemblyai-token-broker.ts:23-95`, `src/hardware/readiness.ts:48-50`
@@ -341,6 +369,7 @@
 - **Verification:** New broker test asserts `GET /healthz` returns `200` with `{ok:true}`; manual `curl http://127.0.0.1:8787/healthz` works.
 
 ### Fix #29 — Add `uncaughtException` / `unhandledRejection` handlers
+
 - **Source:** AUDIT.md → Observability & error handling → O-4
 - **Severity:** Medium
 - **Files affected:** `tools/assemblyai-token-broker.ts:175-177`
@@ -351,6 +380,7 @@
 - **Verification:** Test that throws inside an `setTimeout(() => { throw new Error(...) })` callback — broker logs `fatal` line, shuts down within 5s.
 
 ### Fix #30 — Add `SIGINT`/`SIGTERM` graceful shutdown
+
 - **Source:** AUDIT.md → Observability & error handling → O-5
 - **Severity:** Low
 - **Files affected:** `tools/assemblyai-token-broker.ts:175-177`
@@ -361,6 +391,7 @@
 - **Verification:** Manual: start broker, open a proxy WS connection from the test harness, send `SIGINT` to broker — proxy WS receives a `1001` close, broker process exits cleanly.
 
 ### Fix #31 — Validate `/client-log` payloads
+
 - **Source:** AUDIT.md → Observability & error handling → O-6
 - **Severity:** Low
 - **Files affected:** `tools/assemblyai-token-broker.ts:43-55`
@@ -371,6 +402,7 @@
 - **Verification:** Broker test: POSTing a payload without `stage` returns 400; POSTing a 1 MB `details` blob is truncated in the broker stdout to the cap.
 
 ### Fix #32 — Rate limit token endpoints
+
 - **Source:** AUDIT.md → Observability & error handling → O-8
 - **Severity:** Low
 - **Files affected:** `tools/assemblyai-token-broker.ts:64-91`, `package.json` (deps)
@@ -381,6 +413,7 @@
 - **Verification:** Broker test: rapid-fire 11 token requests within a minute — 11th returns 429 with `Retry-After`.
 
 ### Fix #33 — Rename token broker files to vendor-neutral
+
 - **Source:** AUDIT.md → Architecture & code quality → A-4
 - **Severity:** Medium
 - **Files affected:** rename `tools/assemblyai-token-broker.ts` → `tools/token-broker.ts`; rename `src/asr/AssemblyAiTokenBrokerServer.ts` → `src/asr/tokenBrokerServer.ts`; update env var `ASSEMBLYAI_TOKEN_BROKER_PORT` → `TOKEN_BROKER_PORT` (read both for one minor version, log deprecation if old name is set); update `package.json` (`token-broker` script path), `README.md`, all import sites, and `tests/unit/assemblyAiTokenBrokerServer.test.ts` → `tokenBrokerServer.test.ts`.
@@ -390,6 +423,7 @@
 - **Verification:** `npm test && npm run build` pass; `grep -rn "AssemblyAi.*Broker" src tools tests` returns no matches in renamed scope; old env var with deprecation warning still boots the broker.
 
 ### Fix #34 — Pre-shared bearer token between WebView and broker
+
 - **Source:** AUDIT.md → Security & secrets handling → S-2
 - **Severity:** High
 - **Files affected:** `tools/assemblyai-token-broker.ts:23-91,99-117` (HTTP routes + WS upgrade), `src/asr/DeepgramLiveSession.ts:120-146` (token fetch path), `src/app/runtimeConfig.ts` (broker base + auth header injection), `src/app/main.ts` (passes auth into LiveSession), `.env.example`, `vite.config.ts` (`define` to inject the token at build time), tests
@@ -400,16 +434,18 @@
 - **Verification:** Broker integration tests cover: missing header → 401, wrong token → 401, correct token → success, loopback bypass works. Hardware smoke documents the new env var requirement.
 
 ### Fix #35 — Origin defense-in-depth alongside bearer token
+
 - **Source:** AUDIT.md → Security & secrets handling → S-4
 - **Severity:** Medium
 - **Files affected:** `src/asr/AssemblyAiTokenBrokerServer.ts:15-24` (renamed in Fix #33)
-- **Approach:** Per RESEARCH.md S-4 Option B. Keep the Origin allowlist as a defense-in-depth layer: still reject mismatched origins for browser callers, still allow missing-Origin for non-browser (curl, scripts) — but missing-Origin no longer grants authorization on its own; the bearer token (Fix #34) is the authorization boundary. Add a comment documenting that Origin is *not* the auth boundary.
+- **Approach:** Per RESEARCH.md S-4 Option B. Keep the Origin allowlist as a defense-in-depth layer: still reject mismatched origins for browser callers, still allow missing-Origin for non-browser (curl, scripts) — but missing-Origin no longer grants authorization on its own; the bearer token (Fix #34) is the authorization boundary. Add a comment documenting that Origin is _not_ the auth boundary.
 - **Dependencies:** Fix #34 (bearer token must already gate)
 - **Effort:** S
 - **Risk:** Low
 - **Verification:** Broker tests: bearer-token-correct + Origin-mismatch returns 403; bearer-token-correct + Origin-missing returns 200 (passes through to bearer check); bearer-token-missing + Origin-correct returns 401.
 
 ### Fix #36 — Server-side fixed parameter set in Deepgram proxy
+
 - **Source:** AUDIT.md → Security & secrets handling → S-3
 - **Severity:** High
 - **Files affected:** `src/asr/DeepgramProxy.ts:3-8`, `tools/assemblyai-token-broker.ts:120-122` (renamed `tools/token-broker.ts`)
@@ -423,9 +459,10 @@
 
 ## Wave 3 — Long-Term
 
-**Rationale:** Wave 3 is the architectural-shifts wave. The entry-point refactor (Fix #37) blocks meaningful tests for `main.ts` (Fix #38) and the debounce-renderer change (Fix #41); the strategy-pattern refactor (Fix #39) absorbs the duplicate parse helpers (Fix #40). These are all multi-file rewrites with non-trivial test surface; doing them in Wave 3 means they land *after* Pino logging (#26), broker integration tests (#25), and the lint baseline (#23), so they execute under modern CI infra. The `AudioWorkletNode` migration (Fix #43) is sequenced last because it's an audio-quality risk that benefits from having all observability and tests in place to detect regressions.
+**Rationale:** Wave 3 is the architectural-shifts wave. The entry-point refactor (Fix #37) blocks meaningful tests for `main.ts` (Fix #38) and the debounce-renderer change (Fix #41); the strategy-pattern refactor (Fix #39) absorbs the duplicate parse helpers (Fix #40). These are all multi-file rewrites with non-trivial test surface; doing them in Wave 3 means they land _after_ Pino logging (#26), broker integration tests (#25), and the lint baseline (#23), so they execute under modern CI infra. The `AudioWorkletNode` migration (Fix #43) is sequenced last because it's an audio-quality risk that benefits from having all observability and tests in place to detect regressions.
 
 ### Fix #37 — Refactor `main.ts` into discrete modules
+
 - **Source:** AUDIT.md → Architecture & code quality → A-1
 - **Severity:** Medium
 - **Files affected:** `src/app/main.ts` (slim down to wiring), new `src/app/UIShell.ts`, new `src/app/ASRController.ts`, new `src/app/AudioController.ts`, possibly new `src/app/TelemetryReporter.ts`
@@ -436,6 +473,7 @@
 - **Verification:** Manual smoke: all six buttons still work; auto-smoke (when `?autoSmoke=1`) still kicks off ASR. Fix #38 then formalizes verification.
 
 ### Fix #38 — Add unit tests for refactored entry-point modules
+
 - **Source:** AUDIT.md → Test coverage & CI/CD → T-1
 - **Severity:** High
 - **Files affected:** new `tests/unit/UIShell.test.ts`, `tests/unit/ASRController.test.ts`, `tests/unit/AudioController.test.ts`, possibly `tests/unit/TelemetryReporter.test.ts`, plus a thin `tests/integration/appWiring.test.ts` smoke
@@ -446,6 +484,7 @@
 - **Verification:** Coverage report (Fix #23 has it on) shows `src/app/*.ts` now above a meaningful threshold (e.g., 70% statements). Auto-smoke kickoff path is covered (closes the loop on Fix #19).
 
 ### Fix #39 — Strategy pattern for `LiveAsrSession` (vendor adapter)
+
 - **Source:** AUDIT.md → Architecture & code quality → A-2
 - **Severity:** Medium
 - **Files affected:** new `src/asr/LiveAsrSession.ts`, new `src/asr/AssemblyAiAdapter.ts`, new `src/asr/DeepgramAdapter.ts`, delete or deprecate `src/asr/AssemblyAiLiveSession.ts` and `src/asr/DeepgramLiveSession.ts`, update `src/app/ASRController.ts` (Fix #37) to compose `LiveAsrSession` with the chosen adapter, update tests
@@ -456,6 +495,7 @@
 - **Verification:** Existing tests for AssemblyAi/Deepgram LiveSessions migrate to the strategy form. New unit test asserts adding a new adapter only requires implementing the adapter interface. End-to-end: live AssemblyAI smoke and live Deepgram smoke both still pass.
 
 ### Fix #40 — Extract shared ASR parse helpers
+
 - **Source:** AUDIT.md → Architecture & code quality → A-3
 - **Severity:** Medium
 - **Files affected:** new `src/asr/parseHelpers.ts`, modify `src/asr/AssemblyAiStreamingClient.ts:104-114` and `src/asr/DeepgramStreamingClient.ts:125-137`
@@ -466,6 +506,7 @@
 - **Verification:** Existing parser tests still pass; `grep -c "optionalNumber" src/asr/*.ts` returns 1 (the shared module).
 
 ### Fix #41 — Debounce partials / immediate finals (BLE rate cap)
+
 - **Source:** AUDIT.md → Performance & scalability → P-1
 - **Severity:** Medium
 - **Files affected:** `src/app/UIShell.ts` (Fix #37), `src/app/ASRController.ts` (Fix #37), possibly a new helper `src/app/renderScheduler.ts`
@@ -476,6 +517,7 @@
 - **Verification:** Unit test of the renderScheduler asserts partials within 150ms collapse into one render call; finals fire synchronously. Manual: hardware smoke shows visible captions still update smoothly without flicker.
 
 ### Fix #42 — Cache `CaptionState.segments()` snapshot
+
 - **Source:** AUDIT.md → Performance & scalability → P-2
 - **Severity:** Low
 - **Files affected:** `src/captions/CaptionState.ts:29-31`, `src/captions/formatter.ts:74`
@@ -486,6 +528,7 @@
 - **Verification:** Microbenchmark: 1000 consecutive `state.segments()` calls without mutation are >10× faster than baseline; existing formatter tests still pass.
 
 ### Fix #43 — Migrate browser microphone to `AudioWorkletNode`
+
 - **Source:** AUDIT.md → Architecture & code quality → A-8
 - **Severity:** Low
 - **Files affected:** `src/audio/browserMicrophone.ts:56-78` (rewrite), new `src/audio/audio-worklet-processor.ts` (the AudioWorklet module loaded at runtime), Vite config (worklet asset handling), tests

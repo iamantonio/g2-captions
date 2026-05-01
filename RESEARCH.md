@@ -14,16 +14,19 @@
 ### Candidate approaches
 
 **Option A — Pre-shared bearer token between WebView and broker**
+
 - Pros: Simple. RFC 6750 standard. Both sides already share the local `.env` boundary, so a `BROKER_AUTH_TOKEN` env var fits cleanly. Independent of CORS.
 - Cons: Token has to be injected into the WebView at build time or fetched via a one-time bootstrap; rotating it requires a rebuild.
 - Fit: Excellent. Matches the project's "broker is the trust boundary" model and adds no new dependency.
 
 **Option B — Loopback-only bind plus SSH-tunnel for hardware smoke**
+
 - Pros: Removes the LAN attack surface entirely; loopback is implicitly trusted on the developer machine.
 - Cons: Hardware smoke from the G2 (a separate device) requires an SSH/Tailscale tunnel — meaningful operator friction. `hardware/readiness.ts:43` currently uses `HOST=0.0.0.0`, which would have to go away.
 - Fit: Good for the threat model but bad for the documented hardware-smoke workflow.
 
 **Option C — mTLS between WebView and broker**
+
 - Pros: Strong cryptographic identity; resists token theft.
 - Cons: Significant complexity (cert generation, trust roots inside the WebView, manifest origin compatibility unclear). Overkill for a single-developer prototype.
 - Fit: Poor — the cost-to-benefit is wrong for a Phase-2 prototype.
@@ -47,23 +50,26 @@
 ### Candidate approaches
 
 **Option A — Server-side fixed parameter set**
+
 - Pros: Broker is the sole authority on which model + features are billed. Client provides only the audio bytes. Strongest defense; blast radius is zero.
 - Cons: Loses flexibility — to change a Deepgram parameter you redeploy the broker (low cost since the broker is a local dev process).
-- Fit: Excellent. Matches the project's existing approach for *why* the broker exists at all (server-side trust boundary).
+- Fit: Excellent. Matches the project's existing approach for _why_ the broker exists at all (server-side trust boundary).
 
 **Option B — Per-key allowlist with type validation**
+
 - Pros: Lets the WebView legitimately pick e.g. language while still blocking dangerous params (`model=nova-3-medical`, `extra=...`, `tag=...`, `mip_opt_out`).
 - Cons: Risk drifts: every Deepgram parameter addition needs a triage decision. The Deepgram listen API has 30+ parameters per the AsyncAPI spec, and at least three (`model`, `redact`, `extra`) have direct billing or PII implications.
 - Fit: Acceptable but adds maintenance debt as Deepgram's API evolves.
 
 **Option C — Deny-list for known-dangerous params, pass-through otherwise**
+
 - Pros: Minimal initial code change.
 - Cons: Default-allow is the wrong posture; new Deepgram parameters become silent risks until someone notices. Inverse of the secure default.
 - Fit: Poor — fails the "fail closed" test.
 
 ### Recommendation
 
-**Option A** for the proxy path: hard-code the Deepgram URL parameter set in `DeepgramProxy.ts` (build it from `DeepgramStreamingUrlOptions` set by the broker, not from the incoming request), and ignore `incoming.search`. The client does not need parameter control because today the only WebView call site is the project's own `DeepgramLiveSession`, which passes the same fixed config every time. If parameter flexibility is later needed, evolve to Option B with an explicit allowlist *and* type validation (e.g. `model` must be in `{nova-3, nova-3-general}`, never `nova-3-medical`).
+**Option A** for the proxy path: hard-code the Deepgram URL parameter set in `DeepgramProxy.ts` (build it from `DeepgramStreamingUrlOptions` set by the broker, not from the incoming request), and ignore `incoming.search`. The client does not need parameter control because today the only WebView call site is the project's own `DeepgramLiveSession`, which passes the same fixed config every time. If parameter flexibility is later needed, evolve to Option B with an explicit allowlist _and_ type validation (e.g. `model` must be in `{nova-3, nova-3-general}`, never `nova-3-medical`).
 
 ### Sources
 
@@ -79,16 +85,19 @@
 ### Candidate approaches
 
 **Option A — Refactor entry into testable modules, then test with happy-dom**
+
 - Pros: Decomposes A-1 simultaneously. Pure modules unit-test trivially. The entry point becomes a thin glue layer that's just a wiring smoke test.
 - Cons: Requires refactor before tests. Order of operations matters.
 - Fit: Strong. happy-dom is 2-4× faster than jsdom and Vitest supports both natively per-file via `// @vitest-environment happy-dom`.
 
 **Option B — Real-browser tests via `@vitest/browser` (Playwright/WebDriver)**
+
 - Pros: Catches DOM-real bugs (event listeners, layout, the actual `<pre>` rendering on G2).
 - Cons: New runtime dep; CI complexity (browser binary cache); slower; overkill for a logic-heavy entry point.
 - Fit: Worth considering only after Option A; not a substitute.
 
 **Option C — jsdom + manual mocks for Even Hub bridge**
+
 - Pros: Tests the current monolithic `main.ts` with zero refactor.
 - Cons: jsdom is the slow choice; module-level mutable state in `main.ts` (line 16-22) makes per-test isolation painful — every test would need a `vi.resetModules()` dance.
 - Fit: Mediocre. Buys coverage but doesn't pay down the architectural debt.
@@ -111,16 +120,19 @@
 ### Candidate approaches
 
 **Option A — `superwstest` (HTTP + WS in one supertest-compatible API)**
+
 - Pros: Designed for exactly this case (HTTP + WS on one Node server). API mirrors supertest. Active project. Forces you to start the server in `beforeEach(port:0)` / `afterEach(server.close)`, which matches the recommended pattern.
-- Cons: Adds a dev dep. The project doesn't currently use supertest, so this is *the* dep, not an *additional* dep.
+- Cons: Adds a dev dep. The project doesn't currently use supertest, so this is _the_ dep, not an _additional_ dep.
 - Fit: Best fit. The broker's WS proxy is the most security-sensitive surface and is exactly what `superwstest` is built for.
 
 **Option B — supertest for HTTP + raw `ws` client for WS**
+
 - Pros: supertest is the de-facto Node HTTP test library; `ws` is already a dep. No new dep needed.
 - Cons: WS testing requires hand-rolled event-driven assertions; "websockets are not simple when it comes to writing tests because they are event-driven and have no promise-based API" per the linked Medium article.
 - Fit: Workable but uglier WS tests.
 
 **Option C — Lift route handlers into pure functions and unit-test only**
+
 - Pros: Fastest tests, no port management.
 - Cons: Skips the actual upgrade-handshake and close-coordination logic — exactly the bugs T-2 worries about. Misses the integration-of-routes which is the audit's stated concern.
 - Fit: Doesn't address the finding.
@@ -144,16 +156,19 @@
 ### Candidate approaches
 
 **Option A — Reject when Origin is missing AND request did not come over loopback**
+
 - Pros: Cheap stop-gap; closes the bypass without architecting auth.
 - Cons: Treats Origin as authentication, which OWASP and PortSwigger explicitly call out as wrong.
 - Fit: Mediocre — a half-fix that the next reviewer will ask about.
 
 **Option B — Combine Origin check with bearer token (S-2 fix)**
+
 - Pros: Origin becomes a defense-in-depth layer for browser callers; the bearer token is the actual authorization. Fail-closed by design.
 - Cons: Requires S-2 to land first.
-- Fit: Strongest. Aligns Origin handling with OWASP guidance: Origin is *not* an auth boundary, so don't pretend it is.
+- Fit: Strongest. Aligns Origin handling with OWASP guidance: Origin is _not_ an auth boundary, so don't pretend it is.
 
 **Option C — Use `Sec-Fetch-Site: same-origin` as the gate**
+
 - Pros: Browsers send it unforgeably from secure contexts; `same-origin` distinguishes from cross-site.
 - Cons: Not sent by non-browser clients (so still need bearer for those); not universally available across older WebView runtimes; doesn't help on the WebSocket upgrade path.
 - Fit: Useful only as a belt-and-braces signal alongside Option B.
@@ -176,16 +191,19 @@
 ### Candidate approaches
 
 **Option A — Length + character-class check matching the real key shape**
+
 - Pros: Catches the actual leak shape: `^[a-f0-9]{32,}$` for AssemblyAI / Deepgram. Rejects anything that "looks like" a raw API key.
 - Cons: API-key shapes can change; this becomes a future tripwire (tolerable since the failure mode is loud).
 - Fit: Good. Matches the regexes used by GitGuardian and other secret-scanners.
 
 **Option B — Drop the validator, rely on broker exchange**
+
 - Pros: The broker swap is the actual security boundary — the validator is belt-and-braces.
 - Cons: Loses a cheap failsafe. Project's stated non-negotiable ("API keys must never be embedded in the WebView") is more credible with a runtime check than without.
 - Fit: Acceptable but lossy.
 
-**Option C — Replace with positive validation of the *expected token* shape**
+**Option C — Replace with positive validation of the _expected token_ shape**
+
 - Pros: Asserts what should be true (temporary token format) rather than what shouldn't (raw key shape).
 - Cons: Vendor token shapes are JWT for Deepgram (`eyJ...`) and an opaque string for AssemblyAI — they differ, so the check has to fork by vendor.
 - Fit: Stronger conceptually but more code.
@@ -208,16 +226,19 @@
 ### Candidate approaches
 
 **Option A — Add `DEEPGRAM_API_KEY=your_deepgram_api_key_here` to `.env.example`**
+
 - Pros: Trivial. Matches 12-factor app's "config in environment" principle, where every required env var is documented in a sample file.
 - Cons: None.
 - Fit: Excellent.
 
 **Option B — Add a config-validation step on broker startup**
+
 - Pros: Fails loudly with a clear message instead of a stack trace inside `readDeepgramApiKeyFromEnv`. Pairs with the 12-factor advice on validating config.
 - Cons: A second change on top of A.
 - Fit: Belt-and-braces; combine with A.
 
 **Option C — Treat `.env.example` as canonical, generate broker startup checks from it**
+
 - Pros: Single source of truth.
 - Cons: Tooling complexity; not warranted at this scale.
 - Fit: Overkill.
@@ -240,23 +261,26 @@
 ### Candidate approaches
 
 **Option A — Default-off, explicit opt-in via `?autoSmoke=1`**
+
 - Pros: Inverts the current default to the safe one. Aligns with the documented "explicit user action before live cloud audio" rule. URL-flag preserves the convenience for the developer who actually wants the smoke.
 - Cons: Hardware smoke now requires one extra QR step (`evenhub qr --url "...?autoSmoke=1"`).
 - Fit: Strongest match to the D-0006 / G-0003 non-negotiables.
 
 **Option B — Require an in-WebView confirm-button before the smoke fires**
+
 - Pros: User cannot miss the consent. Even safer than A.
 - Cons: Slows the smoke loop with an unnecessary click in development.
 - Fit: Higher friction than warranted; A is enough.
 
 **Option C — Gate with a separate env-derived signal (e.g., `?hardwareSmoke=<token>`)**
+
 - Pros: Only an operator with the token can trigger; protects against accidental smoke from a tab left open.
 - Cons: New surface to manage, extra friction, low marginal benefit over A.
 - Fit: Overkill.
 
 ### Recommendation
 
-**Option A.** Flip the default. The url-flag-as-feature-flag pattern is established for runtime config in browser apps; `runtimeConfig.ts` already uses `?autoSmoke=0` as the *off* signal — the recommendation is just to invert which value is the default. Add a unit test that asserts the bridge-present path *does not* auto-run unless `autoSmoke=1`.
+**Option A.** Flip the default. The url-flag-as-feature-flag pattern is established for runtime config in browser apps; `runtimeConfig.ts` already uses `?autoSmoke=0` as the _off_ signal — the recommendation is just to invert which value is the default. Add a unit test that asserts the bridge-present path _does not_ auto-run unless `autoSmoke=1`.
 
 ### Sources
 
@@ -272,16 +296,19 @@
 ### Candidate approaches
 
 **Option A — Split into pure TS modules with explicit constructor injection**
+
 - Pros: Each module unit-testable with happy-dom. State is held inside class instances, not module globals, so per-test isolation is trivial. No new dep. Idiomatic for the project's existing class-style code (`DeepgramLiveSession`, `G2LensDisplay`).
 - Cons: One-time refactor cost.
 - Fit: Best — uniform with the rest of the codebase.
 
 **Option B — Adopt a lightweight reactive state library (Zustand-like, e.g. nanostores)**
+
 - Pros: Centralizes mutable state; decouples renders from event sources.
 - Cons: New dep; new mental model. The project's vanilla-DOM style doesn't reach for libraries today.
 - Fit: Mediocre.
 
 **Option C — Adopt a small UI framework (Lit, Solid, Preact)**
+
 - Pros: Components naturally separate concerns; good ecosystem for testing.
 - Cons: Significant new dep; bundle-size impact for an Even Hub WebView; rewrites the rendering layer.
 - Fit: Out of proportion to the prototype's needs.
@@ -293,7 +320,7 @@
 ### Sources
 
 - [TypeScript Handbook — Modules](https://www.typescriptlang.org/docs/handbook/2/modules.html) — official guidance on the project's existing module style.
-- *Refactoring* by Martin Fowler — "Extract Class" is the canonical refactor for this exact symptom (one class doing what should be many). Treated here as established practice; no single URL is the canonical reference.
+- _Refactoring_ by Martin Fowler — "Extract Class" is the canonical refactor for this exact symptom (one class doing what should be many). Treated here as established practice; no single URL is the canonical reference.
 
 ---
 
@@ -304,16 +331,19 @@
 ### Candidate approaches
 
 **Option A — Strategy pattern: one `LiveAsrSession` class + injectable `VendorAdapter`**
+
 - Pros: One bug fix lands once. Adding the planned third vendor (Speechmatics, per `DECISIONS.md` D-0005) is just a new adapter, not a new class. Adapter is a small interface (~5 methods).
 - Cons: Slight indirection cost.
 - Fit: Best — maps directly onto the four real divergences.
 
 **Option B — Abstract base class with vendor-specific subclasses**
+
 - Pros: Familiar OO pattern. Compile-time enforcement of override surface.
 - Cons: Inheritance is more rigid; future vendor with a meaningfully different lifecycle (e.g., REST-based Speechmatics auth) doesn't fit cleanly.
 - Fit: Acceptable; weaker than A.
 
 **Option C — Plain functions: `connect(config)`, `streamPcmChunks(socket, chunks)`, etc.**
+
 - Pros: Simplest possible; no class hierarchy.
 - Cons: Loses the encapsulated socket lifecycle. Caller has to manage `socket` state; defeats the abstraction.
 - Fit: Poor for a stateful WebSocket client.
@@ -325,7 +355,7 @@
 ### Sources
 
 - [TypeScript Handbook — Interfaces & object types](https://www.typescriptlang.org/docs/handbook/2/objects.html) — official patterns for adapter-style interfaces.
-- *Design Patterns* (Gang of Four) — "Strategy" pattern is the canonical solution for this duplication shape; treated as established practice.
+- _Design Patterns_ (Gang of Four) — "Strategy" pattern is the canonical solution for this duplication shape; treated as established practice.
 
 ---
 
@@ -336,16 +366,19 @@
 ### Candidate approaches
 
 **Option A — Plain shared utility module**
+
 - Pros: Zero deps. Each helper is ~5 LOC. No abstraction tax.
 - Cons: None at this scale.
 - Fit: Best.
 
 **Option B — Adopt a parsing/validation library (Zod, Valibot)**
+
 - Pros: Schema-first parsing for both vendor event shapes; replaces the ad-hoc `optionalNumber`/`optionalString` style with declarative schemas.
 - Cons: New dep, more code than the helpers it replaces, performance cost for high-frequency parsing.
 - Fit: Overkill for handful of helpers, but worth considering if the broker grows.
 
 **Option C — Move helpers into a vendor-agnostic namespace inside an existing module**
+
 - Pros: No new file.
 - Cons: Cross-cutting concerns belong in their own module, not stuffed into a vendor file.
 - Fit: Mediocre.
@@ -357,7 +390,7 @@
 ### Sources
 
 - [TypeScript Handbook — Modules](https://www.typescriptlang.org/docs/handbook/2/modules.html) — project's existing module convention.
-- *The Pragmatic Programmer* — DRY (Don't Repeat Yourself) is the canonical principle. Treated as established practice.
+- _The Pragmatic Programmer_ — DRY (Don't Repeat Yourself) is the canonical principle. Treated as established practice.
 
 ---
 
@@ -368,16 +401,19 @@
 ### Candidate approaches
 
 **Option A — Rename to vendor-neutral names with backward-compat alias**
+
 - Pros: Clear intent; new contributors find the broker. Backward-compat env-var alias (`TOKEN_BROKER_PORT` plus a deprecation warning if `ASSEMBLYAI_TOKEN_BROKER_PORT` is still set) avoids breaking local `.env` files.
 - Cons: Touches a few callsites.
 - Fit: Best.
 
 **Option B — Split into two per-vendor brokers (separate processes)**
+
 - Pros: Isolates blast radius; easier per-vendor reasoning.
 - Cons: Doubles operator complexity (two `npm run` commands, two ports). Single broker is documented as intentional in `CLAUDE.md`.
 - Fit: Goes against the project's documented architecture.
 
 **Option C — Leave names, add a doc comment explaining**
+
 - Pros: Zero change.
 - Cons: Doesn't fix the audit finding.
 - Fit: No.
@@ -400,18 +436,21 @@
 ### Candidate approaches
 
 **Option A — Composite key `${event.speaker}:${event.startMs}`**
+
 - Pros: Matches the map's existing intent. Two-element composite is enough because the audit's collision case is exactly speaker-difference at the same start time.
 - Cons: Speaker label `?` (placeholder) collapses unknown speakers into one bucket — but that's the correct semantic for "we don't know who spoke."
 - Fit: Best.
 
 **Option B — Composite key including `vendor` + `speaker` + `startMs`**
+
 - Pros: Defensive against vendor-mixing edge cases.
 - Cons: The project always runs one vendor at a time per session; vendor in the key is purely speculative.
 - Fit: Speculative defense.
 
 **Option C — Per-event UUID/`crypto.randomUUID()`**
+
 - Pros: Trivially unique.
-- Cons: Loses the *intent* of the map — which is to coalesce partials into a single segment as more text arrives. UUID per event creates one segment per partial, breaking the partial→final coalescing.
+- Cons: Loses the _intent_ of the map — which is to coalesce partials into a single segment as more text arrives. UUID per event creates one segment per partial, breaking the partial→final coalescing.
 - Fit: Wrong abstraction.
 
 ### Recommendation
@@ -431,16 +470,19 @@
 ### Candidate approaches
 
 **Option A — `requestAnimationFrame` batching: collect events, render at most ~60fps**
+
 - Pros: Browser-aligned; one render per repaint regardless of input rate. Standard pattern for high-frequency streaming → DOM.
 - Cons: Doesn't help the BLE-write bandwidth problem (BLE is a separate channel that doesn't follow rAF).
 - Fit: Right tool for the DOM half, wrong tool for the BLE half.
 
 **Option B — Trailing debounce for partials, immediate render for finals**
+
 - Pros: Caps both DOM and BLE write rates. Partials at 50-100ms cadence collapse into ~1 render per debounce window (e.g., 150ms); finals are never delayed. Latency-budget impact is bounded by the debounce interval.
 - Cons: One more knob (debounce ms) to tune.
 - Fit: Best for the dual-target rendering (DOM + BLE).
 
 **Option C — rAF batching for DOM + separate rate-limit for BLE writes**
+
 - Pros: Optimizes each channel independently.
 - Cons: Two systems to keep in sync.
 - Fit: Acceptable but more complex than B.
@@ -463,18 +505,21 @@
 ### Candidate approaches
 
 **Option A — Parametric test (`it.each`) over all six kinds**
+
 - Pros: Adding a new kind without adding a test is impossible if the test-kinds list comes from the type. Vitest's `it.each` is purpose-built.
 - Cons: Need a way to keep the parameter list in sync with the type — usually a runtime constant exported alongside the union.
 - Fit: Best.
 
 **Option B — Snapshot test of `formatVisualStatus`**
+
 - Pros: One-liner.
 - Cons: Snapshots drift silently; doesn't enforce the "no sound-only language" assertion at the type level.
 - Fit: Insufficient for the stated invariant.
 
 **Option C — Type-level exhaustiveness check (no runtime test)**
+
 - Pros: Compile-time safety.
-- Cons: Doesn't actually verify the visual-only output, just that all cases are *handled* somehow. Doesn't catch a regression that swaps one visual error for another with sound-prompt language.
+- Cons: Doesn't actually verify the visual-only output, just that all cases are _handled_ somehow. Doesn't catch a regression that swaps one visual error for another with sound-prompt language.
 - Fit: Belt-and-braces alongside Option A; not sufficient alone.
 
 ### Recommendation
@@ -495,16 +540,19 @@
 ### Candidate approaches
 
 **Option A — typescript-eslint flat config + Prettier + Vitest v8 coverage + `audit-ci`**
+
 - Pros: Full canonical Node/TS toolchain. typescript-eslint v8+ is required for ESLint 10 (Feb 2026 release made flat config mandatory). Vitest v8 coverage matches Istanbul accuracy via AST remapping (since Vitest v3.2). `audit-ci` allows allowlisting and severity thresholds.
 - Cons: Five new dev deps; ~30 lines of config. Initial lint cleanup may surface latent issues.
 - Fit: Best for a TS-strict project.
 
 **Option B — Biome (single combined linter + formatter)**
+
 - Pros: One tool replaces ESLint + Prettier; very fast; zero-config defaults.
 - Cons: Smaller rule set than typescript-eslint; some TS-specific rules (e.g., `no-floating-promises`) are not yet at parity. Project already uses TypeScript-specific patterns (catch with `unknown`, etc.) where typescript-eslint has dedicated rules.
 - Fit: Acceptable but loses the deep TypeScript-aware rules.
 
 **Option C — Just typescript-eslint, skip Prettier**
+
 - Pros: Half the config.
 - Cons: Mixing lint + style is a known pain point ESLint stopped doing in v8; ESLint authors recommend a dedicated formatter.
 - Fit: Mediocre.
@@ -528,16 +576,19 @@
 ### Candidate approaches
 
 **Option A — Apache 2.0**
+
 - Pros: Includes an explicit patent grant from contributors — material for a project that touches BLE protocol research (D-0003) and may eventually want to accept community contributions on hardware-protocol code. About 30% of OSS uses Apache 2.0.
 - Cons: Longer (~1700 words) than MIT; requires a NOTICE file for redistributions.
 - Fit: Best for a project with potential hardware/protocol IP concerns and possible future contributions.
 
 **Option B — MIT**
+
 - Pros: Shortest permissive license (~170 words). Most-used license (27% of OSS). Lowest friction for any reuse.
 - Cons: No patent grant. For a project where "BLE writes outside the official Even Hub SDK require a per-experiment safety gate" (D-0003), the absence of a patent grant could matter if the project ever publishes BLE-related code.
 - Fit: Good if Tony's read is "this is small and IP isn't a concern."
 
 **Option C — Explicit "UNLICENSED" / "All rights reserved" in `package.json`**
+
 - Pros: Removes legal ambiguity without committing to OSS.
 - Cons: Blocks any third party redistribution — including community Even Hub plugin sharing.
 - Fit: Reasonable interim default if Tony hasn't decided.
@@ -561,16 +612,19 @@
 ### Candidate approaches
 
 **Option A — Bind `error: unknown`, log with structured logger before transforming**
+
 - Pros: Minimal change; uniform pattern. Combined with `useUnknownInCatchVariables` (already on under strict, per `tsconfig.json:11`), the type system guides correct handling.
 - Cons: Need to instantiate a structured logger first (depends on O-2).
 - Fit: Best.
 
 **Option B — Result-type pattern (`Result<T, E>`)**
+
 - Pros: Compile-time enforcement that errors are handled.
 - Cons: Significant refactor. Idiomatic in Rust/Effect-TS, less so in vanilla TS.
 - Fit: Out of proportion to the prototype.
 
 **Option C — typescript-eslint rule `use-unknown-in-catch-callback-variable` to enforce binding**
+
 - Pros: Mechanical enforcement that every catch binds the variable.
 - Cons: Catches the binding but not the swallowing; still need Option A's logging discipline.
 - Fit: Pair with A.
@@ -593,16 +647,19 @@
 ### Candidate approaches
 
 **Option A — Pino on the Node side, structured `console.info` on the WebView side**
+
 - Pros: Pino is the de-facto Node structured-logging library: 5× faster than Winston, JSON by default, child-logger support for context, pino-pretty for development. WebView can keep `console.info` but structure the payload (level, message, details) so `/client-log` ingests JSON. Cohesive.
 - Cons: One new dep on the Node side; WebView side is convention-only.
 - Fit: Best.
 
 **Option B — Winston (older logger, well-known)**
+
 - Pros: Larger transport ecosystem.
 - Cons: ~5× slower than Pino; less idiomatic for new Node projects in 2026.
 - Fit: Mediocre — picking it would buy compatibility but at a cost.
 
 **Option C — Custom small logger module shared between WebView and broker**
+
 - Pros: Zero deps; uniform shape.
 - Cons: Reinvents what Pino already does well; misses Pino's redaction, child loggers, transport pipelines.
 - Fit: Acceptable but wasteful.
@@ -626,16 +683,19 @@
 ### Candidate approaches
 
 **Option A — Single `/healthz` endpoint, HTTP 200 with no body (or `{ok:true}`)**
+
 - Pros: De-facto Kubernetes/Node convention. Cheap to add. Replaces the `OPTIONS`-probe hack with a real signal.
 - Cons: Doesn't distinguish liveness from readiness — fine here since the broker has no upstream readiness to check beyond "the process is running."
 - Fit: Best for a local dev tool.
 
 **Option B — Separate `/livez` and `/readyz` (Kubernetes idiomatic split)**
+
 - Pros: Forward-compatible with cloud deployment.
-- Cons: Broker isn't deployed to Kubernetes; readiness has nothing meaningful to check (no DB, no upstream that the broker is *gating on*). Pure ceremony.
+- Cons: Broker isn't deployed to Kubernetes; readiness has nothing meaningful to check (no DB, no upstream that the broker is _gating on_). Pure ceremony.
 - Fit: Overkill.
 
 **Option C — Use `lightship` (Kubernetes-aware health/readiness library)**
+
 - Pros: Handles graceful shutdown signal flow alongside health probes — relevant to O-5 too.
 - Cons: New dep for a single endpoint at this scale.
 - Fit: Worth considering only if Tony plans to deploy the broker beyond local dev.
@@ -658,16 +718,19 @@
 ### Candidate approaches
 
 **Option A — Log + graceful shutdown + exit (let process manager restart)**
+
 - Pros: Aligns with Node.js project best-practice ("crash on uncaught, log details, restart"). The structured logger from O-2 captures context; the SIGINT/SIGTERM handler from O-5 handles the graceful close.
 - Cons: Requires O-2 (logger) and a process supervisor in production. For local dev, the developer just re-runs `npm run token-broker`.
 - Fit: Best.
 
 **Option B — Log + continue (suppress crash)**
+
 - Pros: Broker stays up.
 - Cons: "Don't continue in an undefined state" is the universally cited best practice. Risk of cascading corruption.
 - Fit: Anti-pattern.
 
 **Option C — Use `lightship` to coordinate handlers + shutdown**
+
 - Pros: One library handles uncaught, signals, and `/healthz` together (combines O-3 / O-4 / O-5).
 - Cons: New dep for a local dev tool.
 - Fit: Worth considering only if O-3 also picks lightship.

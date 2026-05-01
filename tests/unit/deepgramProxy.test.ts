@@ -3,7 +3,9 @@ import { buildDeepgramProxyUpstreamUrl, buildDeepgramProxyHeaders } from '../../
 
 describe('Deepgram local streaming proxy helpers', () => {
   it('forwards listen query params to Deepgram and keeps auth out of the browser URL', () => {
-    const upstream = buildDeepgramProxyUpstreamUrl('/deepgram/listen?model=nova-3&encoding=linear16&keyterm=ProvenMachine')
+    const upstream = buildDeepgramProxyUpstreamUrl(
+      '/deepgram/listen?model=nova-3&encoding=linear16&keyterm=ProvenMachine',
+    )
 
     expect(upstream.origin).toBe('wss://api.deepgram.com')
     expect(upstream.pathname).toBe('/v1/listen')

@@ -98,7 +98,8 @@ export function mapDeepgramResultsToRawAsrEvent(
     : undefined
 
   const firstWordStart = words?.find((word) => Number.isFinite(word.startMs))?.startMs
-  const lastWordEnd = words === undefined ? undefined : [...words].reverse().find((word) => Number.isFinite(word.endMs))?.endMs
+  const lastWordEnd =
+    words === undefined ? undefined : [...words].reverse().find((word) => Number.isFinite(word.endMs))?.endMs
   const startMs = firstWordStart ?? secondsToMsOr(result.start, context.fallbackStartMs)
   const endMs = lastWordEnd ?? endFromResultTiming(result, startMs, context.receivedAtMs)
 
@@ -120,7 +121,12 @@ export function buildDeepgramCloseStreamMessage(): string {
 }
 
 function endFromResultTiming(result: DeepgramResultsEvent, startMs: number, fallback: number): number {
-  if (typeof result.start === 'number' && Number.isFinite(result.start) && typeof result.duration === 'number' && Number.isFinite(result.duration)) {
+  if (
+    typeof result.start === 'number' &&
+    Number.isFinite(result.start) &&
+    typeof result.duration === 'number' &&
+    Number.isFinite(result.duration)
+  ) {
     return Math.round((result.start + result.duration) * 1000)
   }
   return startMs === fallback ? fallback : Math.max(startMs, fallback)

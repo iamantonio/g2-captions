@@ -15,12 +15,12 @@ The benchmark deliberately uses controlled fixtures only:
 
 ## Fixture set
 
-| Fixture | Source | Purpose | License / dataset note |
-| --- | --- | --- | --- |
-| `clean-short-generated` | `public/fixtures/speech-smoke.pcm` | Clean short speech smoke path | Generated locally for this project; no external dataset license. |
-| `custom-vocab-generated` | scripted synthetic transcript | Exercises `ProvenMachine` and `G2` vocabulary correction | Synthetic/local only; audio can be generated later. |
-| `noisy-speech-scripted` | scripted synthetic transcript | Placeholder for noisy-condition scoring until an approved sample is selected | No external audio included. |
-| `two-speaker-scripted` | scripted synthetic transcript | Placeholder for speaker-label scoring until an approved sample is selected | No external audio included. |
+| Fixture                  | Source                             | Purpose                                                                      | License / dataset note                                           |
+| ------------------------ | ---------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `clean-short-generated`  | `public/fixtures/speech-smoke.pcm` | Clean short speech smoke path                                                | Generated locally for this project; no external dataset license. |
+| `custom-vocab-generated` | scripted synthetic transcript      | Exercises `ProvenMachine` and `G2` vocabulary correction                     | Synthetic/local only; audio can be generated later.              |
+| `noisy-speech-scripted`  | scripted synthetic transcript      | Placeholder for noisy-condition scoring until an approved sample is selected | No external audio included.                                      |
+| `two-speaker-scripted`   | scripted synthetic transcript      | Placeholder for speaker-label scoring until an approved sample is selected   | No external audio included.                                      |
 
 The noisy and two-speaker fixtures are intentionally marked `scripted-only`; they should not be represented as measured public-audio results until a properly licensed public sample is chosen and documented.
 

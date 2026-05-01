@@ -67,7 +67,9 @@ export interface BenchmarkTelemetryRecorder {
   report: () => BenchmarkTelemetryReport
 }
 
-export function createBenchmarkTelemetryRecorder(options: BenchmarkTelemetryRecorderOptions): BenchmarkTelemetryRecorder {
+export function createBenchmarkTelemetryRecorder(
+  options: BenchmarkTelemetryRecorderOptions,
+): BenchmarkTelemetryRecorder {
   const nowMs = options.nowMs ?? Date.now
   const events: BenchmarkTelemetryEvent[] = []
   let cached: BenchmarkTelemetryReport | undefined
@@ -108,8 +110,12 @@ function calculateBenchmarkTelemetryMetrics(events: BenchmarkTelemetryEvent[]): 
     ...(tokenStart && tokenEnd ? { tokenRequestMs: tokenEnd.atMs - tokenStart.atMs } : {}),
     ...(tokenStart && websocketOpen ? { websocketOpenFromStartMs: websocketOpen.atMs - tokenStart.atMs } : {}),
     ...(firstAudio && firstPartial ? { firstPartialFromFirstAudioMs: firstPartial.atMs - firstAudio.atMs } : {}),
-    ...(firstAudio && finalTranscript ? { finalTranscriptFromFirstAudioMs: finalTranscript.atMs - firstAudio.atMs } : {}),
-    ...(finalTranscript && displayUpdate ? { displayUpdateFromFinalTranscriptMs: displayUpdate.atMs - finalTranscript.atMs } : {}),
+    ...(firstAudio && finalTranscript
+      ? { finalTranscriptFromFirstAudioMs: finalTranscript.atMs - firstAudio.atMs }
+      : {}),
+    ...(finalTranscript && displayUpdate
+      ? { displayUpdateFromFinalTranscriptMs: displayUpdate.atMs - finalTranscript.atMs }
+      : {}),
   }
 }
 

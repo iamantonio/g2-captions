@@ -59,6 +59,7 @@ describe('G2 lens caption display', () => {
 
     const startup = bridge.createStartUpPageContainer.mock.calls[0][0]
     expect(startup.textObject[0].content).toBe(G2_STARTUP_CONTENT)
+    // eslint-disable-next-line no-control-regex
     expect(startup.textObject[0].content).toMatch(/^[\x00-\x7F]*$/)
     expect(bridge.textContainerUpgrade.mock.calls[0][0].content).toBe('G2 CAPTIONS\nREADY - starting caption check')
   })

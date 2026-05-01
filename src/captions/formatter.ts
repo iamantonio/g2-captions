@@ -75,7 +75,9 @@ function formatFooter(status: string): string {
 function selectRecentCaptionLines(segments: CaptionSegment[], width: number, maxLines: number): string[] {
   if (maxLines <= 0) return []
 
-  const chronologicalSegments = [...segments].sort((a, b) => a.displayPriority - b.displayPriority || a.startMs - b.startMs)
+  const chronologicalSegments = [...segments].sort(
+    (a, b) => a.displayPriority - b.displayPriority || a.startMs - b.startMs,
+  )
   const selected: string[] = []
 
   for (let i = chronologicalSegments.length - 1; i >= 0; i -= 1) {

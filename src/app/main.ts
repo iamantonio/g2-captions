@@ -9,7 +9,13 @@ import { createBenchmarkTelemetryRecorder, type BenchmarkTelemetryRecorder } fro
 import { G2LensDisplay } from '../display/g2LensDisplay'
 import type { RawAsrEvent } from '../types'
 import { runFixturePrototype } from './runFixturePrototype'
-import { getClientLogEndpoint, getDefaultStreamingEndpoint, getDefaultTokenEndpoint, getSpeechFixtureUrl, shouldAutoRunHardwareSmoke } from './runtimeConfig'
+import {
+  getClientLogEndpoint,
+  getDefaultStreamingEndpoint,
+  getDefaultTokenEndpoint,
+  getSpeechFixtureUrl,
+  shouldAutoRunHardwareSmoke,
+} from './runtimeConfig'
 
 const app = document.querySelector<HTMLElement>('#app')
 const state = new CaptionState()
@@ -312,7 +318,9 @@ async function streamSpeechFixture(): Promise<void> {
   let stage: 'load' | 'stream' | 'terminate' = 'load'
   try {
     renderShell('AUDIO SPEECH FIXTURE LOADING')
-    const fixture = await loadPcmS16LeFixtureFromUrl(getSpeechFixtureUrl(new URL(window.location.href)), { sampleRate: 16_000 })
+    const fixture = await loadPcmS16LeFixtureFromUrl(getSpeechFixtureUrl(new URL(window.location.href)), {
+      sampleRate: 16_000,
+    })
     stage = 'stream'
     renderShell('AUDIO SPEECH FIXTURE STREAMING')
     await session.streamPcmChunks(chunkPcmS16Le(fixture, { chunkMs: 100 }))

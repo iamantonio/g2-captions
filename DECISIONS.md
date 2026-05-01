@@ -110,4 +110,4 @@ Rationale:
 
 - `@evenrealities/even_hub_sdk` is pre-1.0; npm semver treats `^0.0.x` as exact, so no automatic minor/patch updates flow in. Dependabot is configured to surface new releases as PRs (D-4 fix), but each one needs human review.
 - The SDK is the only sanctioned BLE write path (D-0003) and a behavioral change in the bridge contract can break captioning silently. Any new release must pass a hardware smoke (per `docs/11-hardware-smoke.md`) before merge.
-- This decision documents the *intent* behind the existing pin; no code change is required today.
+- This decision documents the _intent_ behind the existing pin; no code change is required today.

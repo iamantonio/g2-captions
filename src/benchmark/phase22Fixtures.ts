@@ -23,7 +23,14 @@ export const phase22BenchmarkFixtures: FixtureBenchmarkDefinition[] = [
     expectedSpeakerLabels: ['A'],
     events: [
       { delayMs: 180, text: 'ProvenMachine captions', status: 'partial', speaker: 'A', startMs: 0, endMs: 900 },
-      { delayMs: 520, text: 'ProvenMachine captions are ready.', status: 'final', speaker: 'A', startMs: 0, endMs: 1900 },
+      {
+        delayMs: 520,
+        text: 'ProvenMachine captions are ready.',
+        status: 'final',
+        speaker: 'A',
+        startMs: 0,
+        endMs: 1900,
+      },
     ],
   },
   {
@@ -38,12 +45,20 @@ export const phase22BenchmarkFixtures: FixtureBenchmarkDefinition[] = [
     expectedSpeakerLabels: ['A'],
     events: [
       { delayMs: 210, text: 'proven machine captions', status: 'partial', speaker: 'A', startMs: 0, endMs: 900 },
-      { delayMs: 640, text: 'proven machine captions are ready on gee two', status: 'final', speaker: 'A', startMs: 0, endMs: 2100 },
+      {
+        delayMs: 640,
+        text: 'proven machine captions are ready on gee two',
+        status: 'final',
+        speaker: 'A',
+        startMs: 0,
+        endMs: 2100,
+      },
     ],
   },
   {
     id: 'noisy-speech-scripted',
-    description: 'Scripted noisy-condition proxy until an approved public-domain/no-license-conflict audio sample is selected.',
+    description:
+      'Scripted noisy-condition proxy until an approved public-domain/no-license-conflict audio sample is selected.',
     source: {
       kind: 'scripted-only',
       license: 'Synthetic transcript fixture; no external audio included.',
@@ -53,7 +68,14 @@ export const phase22BenchmarkFixtures: FixtureBenchmarkDefinition[] = [
     expectedSpeakerLabels: ['A'],
     events: [
       { delayMs: 430, text: 'please repeat meeting code', status: 'partial', speaker: 'A', startMs: 0, endMs: 1100 },
-      { delayMs: 980, text: 'Please repeat the meeting code slowly.', status: 'final', speaker: 'A', startMs: 0, endMs: 2400 },
+      {
+        delayMs: 980,
+        text: 'Please repeat the meeting code slowly.',
+        status: 'final',
+        speaker: 'A',
+        startMs: 0,
+        endMs: 2400,
+      },
     ],
   },
   {

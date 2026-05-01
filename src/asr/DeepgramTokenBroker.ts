@@ -54,7 +54,8 @@ export async function createDeepgramToken(options: CreateDeepgramTokenOptions): 
 
   return {
     accessToken: payload.access_token,
-    expiresInSeconds: typeof payload.expires_in === 'number' && Number.isFinite(payload.expires_in) ? payload.expires_in : ttlSeconds,
+    expiresInSeconds:
+      typeof payload.expires_in === 'number' && Number.isFinite(payload.expires_in) ? payload.expires_in : ttlSeconds,
   }
 }
 

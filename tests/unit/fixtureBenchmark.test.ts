@@ -16,13 +16,24 @@ describe('runFixtureBenchmarkSuite', () => {
         {
           id: 'clean-short-generated',
           description: 'Generated clean short speech fixture',
-          source: { kind: 'generated-local', license: 'local generated test fixture', path: 'public/fixtures/speech-smoke.pcm' },
+          source: {
+            kind: 'generated-local',
+            license: 'local generated test fixture',
+            path: 'public/fixtures/speech-smoke.pcm',
+          },
           expectedTranscript: 'ProvenMachine captions are ready.',
           expectedKeyTerms: ['ProvenMachine'],
           expectedSpeakerLabels: ['A'],
           events: [
             { delayMs: 180, text: 'ProvenMachine captions', status: 'partial', speaker: 'A', startMs: 0, endMs: 900 },
-            { delayMs: 520, text: 'ProvenMachine captions are ready.', status: 'final', speaker: 'A', startMs: 0, endMs: 1900 },
+            {
+              delayMs: 520,
+              text: 'ProvenMachine captions are ready.',
+              status: 'final',
+              speaker: 'A',
+              startMs: 0,
+              endMs: 1900,
+            },
           ],
         },
         {
@@ -34,7 +45,14 @@ describe('runFixtureBenchmarkSuite', () => {
           expectedSpeakerLabels: ['A'],
           events: [
             { delayMs: 210, text: 'proven machine captions', status: 'partial', speaker: 'A', startMs: 0, endMs: 900 },
-            { delayMs: 640, text: 'proven machine captions are ready on gee two', status: 'final', speaker: 'A', startMs: 0, endMs: 2100 },
+            {
+              delayMs: 640,
+              text: 'proven machine captions are ready on gee two',
+              status: 'final',
+              speaker: 'A',
+              startMs: 0,
+              endMs: 2100,
+            },
           ],
         },
         {
@@ -46,7 +64,14 @@ describe('runFixtureBenchmarkSuite', () => {
           expectedSpeakerLabels: ['A', 'B'],
           events: [
             { delayMs: 300, text: 'Can you see captions?', status: 'final', speaker: 'A', startMs: 0, endMs: 1000 },
-            { delayMs: 720, text: 'Yes captions are visible.', status: 'final', speaker: 'B', startMs: 1100, endMs: 2100 },
+            {
+              delayMs: 720,
+              text: 'Yes captions are visible.',
+              status: 'final',
+              speaker: 'B',
+              startMs: 1100,
+              endMs: 2100,
+            },
           ],
         },
       ],
@@ -95,7 +120,14 @@ describe('runFixtureBenchmarkSuite', () => {
           expectedKeyTerms: ['ProvenMachine', 'G2'],
           expectedSpeakerLabels: ['A'],
           events: [
-            { delayMs: 900, text: 'proven caption runs on gee', status: 'final', speaker: '?', startMs: 0, endMs: 1400 },
+            {
+              delayMs: 900,
+              text: 'proven caption runs on gee',
+              status: 'final',
+              speaker: '?',
+              startMs: 0,
+              endMs: 1400,
+            },
           ],
         },
       ],

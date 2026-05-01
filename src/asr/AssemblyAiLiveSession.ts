@@ -122,7 +122,7 @@ export class AssemblyAiLiveSession {
     let response: Response
     try {
       response = await this.fetchImpl(this.options.tokenEndpoint, { method: 'POST' })
-    } catch (error) {
+    } catch {
       this.options.onVisualStatus('ASR TOKEN FAILED — check broker')
       throw new Error('AssemblyAI token request failed')
     }
@@ -156,7 +156,7 @@ export class AssemblyAiLiveSession {
           fallbackStartMs: this.nowMs(),
         }),
       )
-    } catch (error) {
+    } catch {
       this.options.onVisualStatus('ASR MESSAGE FAILED — captions paused')
     }
   }

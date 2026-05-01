@@ -3,7 +3,14 @@ import { runFixturePrototype } from '../src/app/runFixturePrototype'
 const result = await runFixturePrototype({
   events: [
     { delayMs: 120, text: 'proven machine is ready', status: 'partial', speaker: 'A', startMs: 0, endMs: 900 },
-    { delayMs: 260, text: 'proven machine is ready on gee two', status: 'final', speaker: 'A', startMs: 0, endMs: 1200 },
+    {
+      delayMs: 260,
+      text: 'proven machine is ready on gee two',
+      status: 'final',
+      speaker: 'A',
+      startMs: 0,
+      endMs: 1200,
+    },
   ],
   vocabulary: [
     { canonical: 'ProvenMachine', aliases: ['proven machine'], category: 'company', priority: 10 },

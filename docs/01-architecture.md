@@ -29,14 +29,14 @@ Decision log: `DECISIONS.md`
 
 ### Must satisfy
 
-| Target | Architecture implication |
-|---|---|
+| Target                              | Architecture implication                                                                                               |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Caption-to-display latency <=800 ms | Use streaming ASR partials, avoid blocking on final transcripts, use incremental display updates, measure every stage. |
-| Noisy WER <=12% | Benchmark multiple ASR vendors on noisy corpus before committing. |
-| Speaker labels >=2 speakers | Prefer ASR vendor built-in streaming diarization first; keep dedicated diarization fallback. |
-| Custom vocabulary hit rate >=90% | Use vendor keyterms/custom dictionary where available; add post-ASR vocabulary correction layer. |
-| Lens readability via Tony testing | Formatter must be independently tunable: lines, characters, scroll, speaker label style, partial/final treatment. |
-| Accessibility-first | Every state and error must be visible on the lens and phone; no audio-only cues. |
+| Noisy WER <=12%                     | Benchmark multiple ASR vendors on noisy corpus before committing.                                                      |
+| Speaker labels >=2 speakers         | Prefer ASR vendor built-in streaming diarization first; keep dedicated diarization fallback.                           |
+| Custom vocabulary hit rate >=90%    | Use vendor keyterms/custom dictionary where available; add post-ASR vocabulary correction layer.                       |
+| Lens readability via Tony testing   | Formatter must be independently tunable: lines, characters, scroll, speaker label style, partial/final treatment.      |
+| Accessibility-first                 | Every state and error must be visible on the lens and phone; no audio-only cues.                                       |
 
 ### Explicit non-goals for Phase 2 prototype
 
@@ -184,13 +184,13 @@ This is not a final phone-platform lock. It is an architecture that prevents loc
 
 No final ASR vendor is committed. Phase 2 must benchmark at least two hosted vendors before selecting.
 
-| Vendor/path | Latency evidence | Diarization | Custom vocabulary | Cost evidence | Privacy/offline | Recommendation |
-|---|---:|---|---|---:|---|---|
-| AssemblyAI Universal-3 Pro Streaming | Docs claim sub-300 ms time-to-complete transcript latency | Streaming speaker labels; short turns under ~1s may be `UNKNOWN` | Dynamic keyterms up to 100 | $0.45/hr U3 Pro streaming + $0.12/hr diarization | Cloud | **Primary benchmark candidate** |
-| Deepgram Nova-3 Streaming | Vendor claims real-time transcripts under 300 ms | Streaming diarization with `diarize=true` | Keyterm prompting up to 100 | $0.0077/min | Cloud | **Primary benchmark candidate** |
-| Speechmatics Real-Time | Claims 90%+ accuracy with <1s latency; partials in few hundred ms; caveat final can vary | Real-time speaker/channel diarization | Custom dictionary up to 1000 words/phrases | Pro realtime from ~$0.24/hr | Cloud / enterprise deployment | **Secondary benchmark candidate; strong custom vocab** |
-| OpenAI Realtime / GPT-4o Transcribe | Realtime low-latency platform; exact caption latency unverified | File diarization exists; realtime diarization unverified | Prompting exists; diarized prompt behavior unclear | Token-based; effective per-minute cost unverified | Cloud | Watchlist, not Phase 2 primary |
-| WhisperKit / whisper.cpp | On-device latency depends model/device; WhisperKit paper claims 0.46s latency in benchmark | No robust built-in diarization path equivalent to hosted vendors | Custom vocab weaker than vendor keyterms | No API cost | Offline | Degraded/offline fallback track |
+| Vendor/path                          |                                                                           Latency evidence | Diarization                                                      | Custom vocabulary                                  |                                     Cost evidence | Privacy/offline               | Recommendation                                         |
+| ------------------------------------ | -----------------------------------------------------------------------------------------: | ---------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------: | ----------------------------- | ------------------------------------------------------ |
+| AssemblyAI Universal-3 Pro Streaming |                                  Docs claim sub-300 ms time-to-complete transcript latency | Streaming speaker labels; short turns under ~1s may be `UNKNOWN` | Dynamic keyterms up to 100                         |  $0.45/hr U3 Pro streaming + $0.12/hr diarization | Cloud                         | **Primary benchmark candidate**                        |
+| Deepgram Nova-3 Streaming            |                                           Vendor claims real-time transcripts under 300 ms | Streaming diarization with `diarize=true`                        | Keyterm prompting up to 100                        |                                       $0.0077/min | Cloud                         | **Primary benchmark candidate**                        |
+| Speechmatics Real-Time               |   Claims 90%+ accuracy with <1s latency; partials in few hundred ms; caveat final can vary | Real-time speaker/channel diarization                            | Custom dictionary up to 1000 words/phrases         |                       Pro realtime from ~$0.24/hr | Cloud / enterprise deployment | **Secondary benchmark candidate; strong custom vocab** |
+| OpenAI Realtime / GPT-4o Transcribe  |                            Realtime low-latency platform; exact caption latency unverified | File diarization exists; realtime diarization unverified         | Prompting exists; diarized prompt behavior unclear | Token-based; effective per-minute cost unverified | Cloud                         | Watchlist, not Phase 2 primary                         |
+| WhisperKit / whisper.cpp             | On-device latency depends model/device; WhisperKit paper claims 0.46s latency in benchmark | No robust built-in diarization path equivalent to hosted vendors | Custom vocab weaker than vendor keyterms           |                                       No API cost | Offline                       | Degraded/offline fallback track                        |
 
 Sources:
 
@@ -228,18 +228,18 @@ Target: **<=800 ms spoken word → glyph rendered on lens**.
 
 This budget assumes captions are allowed to display stable partials before final ASR output. If we wait for final transcripts only, the target is likely at risk.
 
-| Stage | Budget | Notes |
-|---|---:|---|
-| Audio capture frame/chunk | 80 ms | Use small chunks; avoid buffering >100 ms. |
-| Audio normalization/encoding | 30 ms | Prefer raw PCM where vendor supports it. |
-| Network uplink | 80 ms | Mobile network/Wi-Fi dependent; measure separately. |
-| ASR partial emission | 250 ms | Vendor claims are often <300 ms; benchmark actual. |
-| Diarization label attach | 80 ms | Prefer vendor built-in labels; avoid separate model in fast path. |
-| Custom vocabulary correction | 25 ms | Local deterministic correction only; no LLM in fast path. |
-| Caption state/formatter | 25 ms | Pure local operations. |
-| SDK display update / BLE transport | 150 ms | Must measure with G2; use incremental text update. |
-| Display refresh / render visibility | 80 ms | G2 refresh rate listed as 60 Hz in support specs; end-to-visible method TBD. Source: https://support.evenrealities.com/hc/en-us/articles/13499229138959-Specs |
-| **Total** | **800 ms** | Leaves no slack; all instrumentation required. |
+| Stage                               |     Budget | Notes                                                                                                                                                         |
+| ----------------------------------- | ---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Audio capture frame/chunk           |      80 ms | Use small chunks; avoid buffering >100 ms.                                                                                                                    |
+| Audio normalization/encoding        |      30 ms | Prefer raw PCM where vendor supports it.                                                                                                                      |
+| Network uplink                      |      80 ms | Mobile network/Wi-Fi dependent; measure separately.                                                                                                           |
+| ASR partial emission                |     250 ms | Vendor claims are often <300 ms; benchmark actual.                                                                                                            |
+| Diarization label attach            |      80 ms | Prefer vendor built-in labels; avoid separate model in fast path.                                                                                             |
+| Custom vocabulary correction        |      25 ms | Local deterministic correction only; no LLM in fast path.                                                                                                     |
+| Caption state/formatter             |      25 ms | Pure local operations.                                                                                                                                        |
+| SDK display update / BLE transport  |     150 ms | Must measure with G2; use incremental text update.                                                                                                            |
+| Display refresh / render visibility |      80 ms | G2 refresh rate listed as 60 Hz in support specs; end-to-visible method TBD. Source: https://support.evenrealities.com/hc/en-us/articles/13499229138959-Specs |
+| **Total**                           | **800 ms** | Leaves no slack; all instrumentation required.                                                                                                                |
 
 ### Latency rules
 
@@ -398,13 +398,13 @@ Target: >=90% on Tony’s wordlist.
 
 ### Modes
 
-| Mode | Trigger | Behavior | Expected metric status |
-|---|---|---|---|
-| Cloud primary | network healthy | Hosted ASR + diarization + keyterms | Target-capable |
-| Cloud degraded | latency/network unstable | Show network status; keep partials; reduce update frequency if needed | May miss <=800 ms |
-| Offline captions | cloud unavailable | WhisperKit/whisper.cpp or platform speech if available | Likely no target diarization/custom vocab |
-| Phone-only display | G2 disconnected | Continue captions on phone with visual reconnect state | Accessibility fallback |
-| No mic permission | mic blocked | Visual instruction and stop capture | No silent failure |
+| Mode               | Trigger                  | Behavior                                                              | Expected metric status                    |
+| ------------------ | ------------------------ | --------------------------------------------------------------------- | ----------------------------------------- |
+| Cloud primary      | network healthy          | Hosted ASR + diarization + keyterms                                   | Target-capable                            |
+| Cloud degraded     | latency/network unstable | Show network status; keep partials; reduce update frequency if needed | May miss <=800 ms                         |
+| Offline captions   | cloud unavailable        | WhisperKit/whisper.cpp or platform speech if available                | Likely no target diarization/custom vocab |
+| Phone-only display | G2 disconnected          | Continue captions on phone with visual reconnect state                | Accessibility fallback                    |
+| No mic permission  | mic blocked              | Visual instruction and stop capture                                   | No silent failure                         |
 
 ### Degraded behavior requirements
 

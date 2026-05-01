@@ -14,10 +14,10 @@ describe('downsampleFloat32ToPcmS16Le', () => {
 describe('BrowserMicrophonePcmSource', () => {
   it('surfaces permission and capture states visually', async () => {
     const statuses: string[] = []
-    const getUserMedia = vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream))
+    const getUserMedia = vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] }) as unknown as MediaStream)
     const source = new BrowserMicrophonePcmSource({
       getUserMedia,
-      createAudioContext: () => ({ close: vi.fn(async () => undefined) } as unknown as AudioContext),
+      createAudioContext: () => ({ close: vi.fn(async () => undefined) }) as unknown as AudioContext,
       onVisualStatus: (status) => statuses.push(status),
       onChunk: vi.fn(),
     })
@@ -25,7 +25,9 @@ describe('BrowserMicrophonePcmSource', () => {
     await source.start()
     await source.stop()
 
-    expect(getUserMedia).toHaveBeenCalledWith({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false } })
+    expect(getUserMedia).toHaveBeenCalledWith({
+      audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false },
+    })
     expect(statuses).toContain('BROWSER MIC PERMISSION — waiting')
     expect(statuses).toContain('BROWSER MIC LIVE — captions streaming')
     expect(statuses).toContain('BROWSER MIC STOPPED — captions paused')
@@ -37,7 +39,7 @@ describe('BrowserMicrophonePcmSource', () => {
       getUserMedia: vi.fn(async () => {
         throw new DOMException('denied', 'NotAllowedError')
       }),
-      createAudioContext: () => ({ close: vi.fn(async () => undefined) } as unknown as AudioContext),
+      createAudioContext: () => ({ close: vi.fn(async () => undefined) }) as unknown as AudioContext,
       onVisualStatus: (status) => statuses.push(status),
       onChunk: vi.fn(),
     })

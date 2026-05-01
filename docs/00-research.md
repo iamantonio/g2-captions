@@ -140,12 +140,12 @@ Target: ≤800 ms spoken word → glyph rendered on lens. Vendor transcription l
 
 ### Hosted ASR candidates
 
-| Option | Latency evidence | Diarization | Custom vocab | Cost evidence | Main tradeoff |
-|---|---:|---|---|---:|---|
-| Deepgram Nova-3 / Flux | Vendor claims real-time transcripts under 300 ms | Streaming diarization via `diarize=true` | Keyterm prompting up to 100 terms | Nova-3/Flux $0.0077/min PAYG | Strong latency/keyterm candidate; noisy G2 WER unverified |
-| AssemblyAI Universal-3 Pro Streaming | Docs claim sub-300 ms time-to-complete transcript latency for `u3-rt-pro` | Streaming diarization on all streaming models; `speaker_labels=true`; short turns under ~1s may be `UNKNOWN` | Keyterms up to 100, dynamic updates | U3 Pro streaming $0.45/hr; diarization $0.12/hr | Best documented latency + diarization + dynamic keyterms; must benchmark real noise |
-| Speechmatics Real-Time | Claims 90%+ accuracy with <1s latency; partials in few hundred ms; some docs caveat final can be up to 2s depending settings | Real-time speaker, channel, and channel+speaker diarization | Custom dictionary up to 1000 words/phrases with `sounds_like` | Pro real-time starts around $0.24/hr | Strong diarization/custom dictionary/cost; ≤800 ms final path needs proof |
-| OpenAI Realtime / GPT-4o Transcribe | Realtime API intended for low-latency audio; exact caption latency not found | File diarization exists for `gpt-4o-transcribe-diarize`; realtime diarization unverified | Prompting exists for `gpt-4o-transcribe`; diarize model prompt support not present | Token-based; effective per-minute live-caption cost unverified | Strong model ecosystem; realtime diarization/custom-vocab path unclear |
+| Option                               |                                                                                                             Latency evidence | Diarization                                                                                                  | Custom vocab                                                                       |                                                  Cost evidence | Main tradeoff                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------: | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | -------------------------------------------------------------: | ----------------------------------------------------------------------------------- |
+| Deepgram Nova-3 / Flux               |                                                                             Vendor claims real-time transcripts under 300 ms | Streaming diarization via `diarize=true`                                                                     | Keyterm prompting up to 100 terms                                                  |                                   Nova-3/Flux $0.0077/min PAYG | Strong latency/keyterm candidate; noisy G2 WER unverified                           |
+| AssemblyAI Universal-3 Pro Streaming |                                                    Docs claim sub-300 ms time-to-complete transcript latency for `u3-rt-pro` | Streaming diarization on all streaming models; `speaker_labels=true`; short turns under ~1s may be `UNKNOWN` | Keyterms up to 100, dynamic updates                                                |                U3 Pro streaming $0.45/hr; diarization $0.12/hr | Best documented latency + diarization + dynamic keyterms; must benchmark real noise |
+| Speechmatics Real-Time               | Claims 90%+ accuracy with <1s latency; partials in few hundred ms; some docs caveat final can be up to 2s depending settings | Real-time speaker, channel, and channel+speaker diarization                                                  | Custom dictionary up to 1000 words/phrases with `sounds_like`                      |                           Pro real-time starts around $0.24/hr | Strong diarization/custom dictionary/cost; ≤800 ms final path needs proof           |
+| OpenAI Realtime / GPT-4o Transcribe  |                                                 Realtime API intended for low-latency audio; exact caption latency not found | File diarization exists for `gpt-4o-transcribe-diarize`; realtime diarization unverified                     | Prompting exists for `gpt-4o-transcribe`; diarize model prompt support not present | Token-based; effective per-minute live-caption cost unverified | Strong model ecosystem; realtime diarization/custom-vocab path unclear              |
 
 Sources:
 
@@ -166,11 +166,11 @@ Sources:
 
 ### On-device / offline candidates
 
-| Option | Evidence | Strength | Risk |
-|---|---|---|---|
-| Whisper.cpp | Cross-platform local Whisper implementation; model RAM requirements vary heavily by model | Offline/privacy/cost | No built-in diarization; mobile latency/battery/thermal uncertain |
-| WhisperKit / MLX on Apple | WhisperKit paper claims 0.46s latency and 2.2% WER in its benchmark | Strong Apple-device offline candidate | Apple-only OSS path; diarization/custom vocabulary weaker than hosted APIs |
-| Apple Speech framework | Live audio recognition on iOS; supports custom language model data and custom pronunciations | Native iOS, possible custom vocabulary | Apple service/offline behavior and diarization not enough for target alone |
+| Option                    | Evidence                                                                                     | Strength                               | Risk                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------- |
+| Whisper.cpp               | Cross-platform local Whisper implementation; model RAM requirements vary heavily by model    | Offline/privacy/cost                   | No built-in diarization; mobile latency/battery/thermal uncertain          |
+| WhisperKit / MLX on Apple | WhisperKit paper claims 0.46s latency and 2.2% WER in its benchmark                          | Strong Apple-device offline candidate  | Apple-only OSS path; diarization/custom vocabulary weaker than hosted APIs |
+| Apple Speech framework    | Live audio recognition on iOS; supports custom language model data and custom pronunciations | Native iOS, possible custom vocabulary | Apple service/offline behavior and diarization not enough for target alone |
 
 Sources:
 
@@ -192,11 +192,11 @@ This is **not** a vendor commitment. Tony approval required before using API key
 
 ## 4. Diarization landscape
 
-| Option | Evidence | Fit | Risk |
-|---|---|---|---|
-| Vendor built-in diarization: AssemblyAI / Deepgram / Speechmatics | All document real-time/streaming diarization support | Lowest integration complexity; direct labels in transcript stream | Label stability in short overlapping turns must be benchmarked |
-| pyannote.audio / pyannoteAI | Open-source PyTorch speaker diarization toolkit; pyannoteAI claims real-time diarization under 150 ms / sub-100 ms | Strong dedicated diarization layer; can augment ASR | Extra service/model path adds latency and complexity |
-| NVIDIA NeMo Streaming Sortformer | NVIDIA docs describe online/streaming Sortformer diarizer; blog says real-time speaker labels for 2–4+ speakers and up to four speakers | Powerful self-hosted/GPU path | Not phone-native; likely backend/GPU operational burden |
+| Option                                                            | Evidence                                                                                                                                | Fit                                                               | Risk                                                           |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
+| Vendor built-in diarization: AssemblyAI / Deepgram / Speechmatics | All document real-time/streaming diarization support                                                                                    | Lowest integration complexity; direct labels in transcript stream | Label stability in short overlapping turns must be benchmarked |
+| pyannote.audio / pyannoteAI                                       | Open-source PyTorch speaker diarization toolkit; pyannoteAI claims real-time diarization under 150 ms / sub-100 ms                      | Strong dedicated diarization layer; can augment ASR               | Extra service/model path adds latency and complexity           |
+| NVIDIA NeMo Streaming Sortformer                                  | NVIDIA docs describe online/streaming Sortformer diarizer; blog says real-time speaker labels for 2–4+ speakers and up to four speakers | Powerful self-hosted/GPU path                                     | Not phone-native; likely backend/GPU operational burden        |
 
 Sources:
 

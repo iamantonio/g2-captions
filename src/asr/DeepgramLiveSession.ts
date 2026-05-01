@@ -157,7 +157,10 @@ export class DeepgramLiveSession {
       })
       const telemetryDetails: BenchmarkTelemetryDetails = { transcript: mapped.text }
       if (mapped.speaker && mapped.speaker !== '?') telemetryDetails.speaker = mapped.speaker
-      this.markTelemetry(mapped.status === 'final' ? 'final_transcript_received' : 'first_partial_received', telemetryDetails)
+      this.markTelemetry(
+        mapped.status === 'final' ? 'final_transcript_received' : 'first_partial_received',
+        telemetryDetails,
+      )
       this.options.onTranscript(mapped)
     } catch {
       this.options.onVisualStatus('ASR MESSAGE FAILED — captions paused')

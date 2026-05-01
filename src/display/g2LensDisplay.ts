@@ -16,16 +16,19 @@ export interface G2CaptionBridge {
   rebuildPageContainer?(container: RebuildPageContainer): Promise<boolean>
 }
 
-export type G2DisplayResult =
-  | { ok: true }
-  | { ok: false; visualStatus: string }
+export type G2DisplayResult = { ok: true } | { ok: false; visualStatus: string }
 
 export function sanitizeG2LensText(content: string): string {
-  return content
-    .replace(/[\u2013\u2014]/g, '-')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201C\u201D]/g, '"')
-    .replace(/[^\x0A\x0D\x20-\x7E]/g, '')
+  // Strip everything outside the G2 lens's ASCII printable + LF/CR range.
+  // The control-char escape is intentional \u2014 eslint-disable applies only here.
+  return (
+    content
+      .replace(/[\u2013\u2014]/g, '-')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[^\x0A\x0D\x20-\x7E]/g, '')
+  )
 }
 
 export function createCaptionTextContainer(content: string): TextContainerProperty {

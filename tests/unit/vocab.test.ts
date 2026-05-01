@@ -40,8 +40,6 @@ describe('applyVocabularyCorrections', () => {
     const result = applyVocabularyCorrections('we shipped the speech pro suite today', vocab)
 
     expect(result.text).toBe('we shipped the Speech Pro Suite today')
-    expect(result.corrections).toEqual([
-      { from: 'speech pro suite', to: 'Speech Pro Suite', category: 'product' },
-    ])
+    expect(result.corrections).toEqual([{ from: 'speech pro suite', to: 'Speech Pro Suite', category: 'product' }])
   })
 })

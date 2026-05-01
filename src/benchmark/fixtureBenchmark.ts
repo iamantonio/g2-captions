@@ -93,7 +93,10 @@ export async function runFixtureBenchmarkSuite(input: FixtureBenchmarkSuiteInput
   }
 }
 
-function runFixtureBenchmark(fixture: FixtureBenchmarkDefinition, vocabulary: VocabularyEntry[]): FixtureBenchmarkResult {
+function runFixtureBenchmark(
+  fixture: FixtureBenchmarkDefinition,
+  vocabulary: VocabularyEntry[],
+): FixtureBenchmarkResult {
   const finalEvents = fixture.events.filter((event) => event.status === 'final')
   const terminalEvents = finalEvents.length > 0 ? finalEvents : fixture.events.slice(-1)
   const observedTranscript = terminalEvents
@@ -124,7 +127,8 @@ function runFixtureBenchmark(fixture: FixtureBenchmarkDefinition, vocabulary: Vo
     speakerLabelHitRate:
       speakerLabelsExpected === 0
         ? 1
-        : fixture.expectedSpeakerLabels.filter((speaker) => observedSpeakerLabels.includes(speaker)).length / speakerLabelsExpected,
+        : fixture.expectedSpeakerLabels.filter((speaker) => observedSpeakerLabels.includes(speaker)).length /
+          speakerLabelsExpected,
   }
 
   return {
@@ -148,14 +152,16 @@ function aggregateFixtureResults(fixtures: FixtureBenchmarkResult[]): FixtureBen
   const vocabularyHits = sum(fixtures.map((fixture) => fixture.metrics.customVocabularyHits))
   const speakerExpected = sum(fixtures.map((fixture) => fixture.metrics.speakerLabelsExpected))
   const speakerHits = sum(
-    fixtures.map((fixture) =>
-      fixture.expectedSpeakerLabels.filter((speaker) => fixture.observedSpeakerLabels.includes(speaker)).length,
+    fixtures.map(
+      (fixture) =>
+        fixture.expectedSpeakerLabels.filter((speaker) => fixture.observedSpeakerLabels.includes(speaker)).length,
     ),
   )
 
   return {
     fixtureCount,
-    exactMatchRate: fixtureCount === 0 ? 0 : fixtures.filter((fixture) => fixture.metrics.exactMatch).length / fixtureCount,
+    exactMatchRate:
+      fixtureCount === 0 ? 0 : fixtures.filter((fixture) => fixture.metrics.exactMatch).length / fixtureCount,
     meanWordErrorRateLite:
       fixtureCount === 0 ? 0 : sum(fixtures.map((fixture) => fixture.metrics.wordErrorRateLite)) / fixtureCount,
     customVocabularyHitRate: vocabularyExpected === 0 ? 1 : vocabularyHits / vocabularyExpected,

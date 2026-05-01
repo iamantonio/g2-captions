@@ -1,7 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
 import { createAssemblyAiToken } from '../src/asr/AssemblyAiTokenBroker'
-import { getTokenBrokerBindHost, getTokenBrokerCorsOrigin, isAllowedTokenBrokerOrigin } from '../src/asr/AssemblyAiTokenBrokerServer'
+import {
+  getTokenBrokerBindHost,
+  getTokenBrokerCorsOrigin,
+  isAllowedTokenBrokerOrigin,
+} from '../src/asr/AssemblyAiTokenBrokerServer'
 import { buildDeepgramProxyHeaders, buildDeepgramProxyUpstreamUrl } from '../src/asr/DeepgramProxy'
 import { createDeepgramToken, readDeepgramApiKeyFromEnv } from '../src/asr/DeepgramTokenBroker'
 
@@ -15,9 +19,7 @@ function parseBrokerPort(raw: string | undefined): number {
   if (raw === undefined) return fallback
   const parsed = Number.parseInt(raw, 10)
   if (!Number.isInteger(parsed) || parsed <= 0 || parsed >= 65536) {
-    throw new Error(
-      `ASSEMBLYAI_TOKEN_BROKER_PORT must be an integer in 1..65535 (got ${JSON.stringify(raw)})`,
-    )
+    throw new Error(`ASSEMBLYAI_TOKEN_BROKER_PORT must be an integer in 1..65535 (got ${JSON.stringify(raw)})`)
   }
   return parsed
 }

@@ -89,7 +89,8 @@ export function mapAssemblyAiTurnToRawAsrEvent(
     : undefined
 
   const firstWordStart = words?.find((word) => Number.isFinite(word.startMs))?.startMs
-  const lastWordEnd = words === undefined ? undefined : [...words].reverse().find((word) => Number.isFinite(word.endMs))?.endMs
+  const lastWordEnd =
+    words === undefined ? undefined : [...words].reverse().find((word) => Number.isFinite(word.endMs))?.endMs
 
   return {
     vendor: 'assemblyai',

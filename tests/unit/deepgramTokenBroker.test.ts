@@ -12,11 +12,12 @@ describe('Deepgram token broker', () => {
   })
 
   it('requests a short-lived temporary token without exposing the API key in the response', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ access_token: 'dg-temp-token', expires_in: 60 }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ access_token: 'dg-temp-token', expires_in: 60 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     )
 
     const result = await createDeepgramToken({ apiKey: 'server-side-key', ttlSeconds: 60, fetchImpl: fetchMock })

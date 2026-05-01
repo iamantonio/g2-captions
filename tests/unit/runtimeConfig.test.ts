@@ -22,7 +22,9 @@ describe('runtime config for Hub hardware smoke tests', () => {
 
   it('uses the same LAN broker for the local Deepgram streaming proxy', () => {
     expect(getDefaultStreamingEndpoint(new URL('http://127.0.0.1:5173/'))).toBe('ws://127.0.0.1:8787/deepgram/listen')
-    expect(getDefaultStreamingEndpoint(new URL('http://172.20.10.5:5173/'))).toBe('ws://172.20.10.5:8787/deepgram/listen')
+    expect(getDefaultStreamingEndpoint(new URL('http://172.20.10.5:5173/'))).toBe(
+      'ws://172.20.10.5:8787/deepgram/listen',
+    )
     expect(getDefaultStreamingEndpoint(new URL('https://hub.local/apps/g2-captions/'))).toBe(
       'wss://hub.local:8787/deepgram/listen',
     )

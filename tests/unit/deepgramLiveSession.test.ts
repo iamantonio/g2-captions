@@ -34,11 +34,12 @@ describe('DeepgramLiveSession', () => {
     FakeWebSocket.instances = []
     const onTranscript = vi.fn()
     const onVisualStatus = vi.fn()
-    const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify({ accessToken: 'dg-temp-token', expiresInSeconds: 60 }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ accessToken: 'dg-temp-token', expiresInSeconds: 60 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     )
 
     const session = new DeepgramLiveSession({
@@ -66,7 +67,9 @@ describe('DeepgramLiveSession', () => {
         data: JSON.stringify({
           type: 'Results',
           is_final: true,
-          channel: { alternatives: [{ transcript: 'hello Tony', words: [{ word: 'hello', start: 0, end: 0.2, speaker: 1 }] }] },
+          channel: {
+            alternatives: [{ transcript: 'hello Tony', words: [{ word: 'hello', start: 0, end: 0.2, speaker: 1 }] }],
+          },
         }),
       }),
     )

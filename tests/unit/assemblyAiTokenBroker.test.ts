@@ -12,11 +12,12 @@ describe('AssemblyAI token broker', () => {
   })
 
   it('requests a short-lived temporary token without exposing the API key in the response', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ token: 'temp-token', expires_in_seconds: 60 }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ token: 'temp-token', expires_in_seconds: 60 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     )
 
     const result = await createAssemblyAiToken({

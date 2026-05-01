@@ -12,17 +12,29 @@
     "benchmark:fixtures": "tsx tools/run-fixture-benchmark.ts",
     "hardware:readiness": "tsx tools/run-hardware-readiness.ts",
     "token-broker": "tsx tools/assemblyai-token-broker.ts",
-    "clean": "rm -rf dist artifacts coverage && rm -f *.ehpk"
+    "clean": "rm -rf dist artifacts coverage && rm -f *.ehpk",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:coverage": "vitest run --coverage",
+    "audit:ci": "audit-ci --moderate"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.10",
     "ws": "^8.20.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.15.3",
     "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^3.2.4",
+    "audit-ci": "^7.1.0",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.59.1",
     "vite": "^6.3.4",
     "vitest": "^3.1.2"
   }

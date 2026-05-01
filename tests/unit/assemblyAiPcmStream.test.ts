@@ -32,11 +32,12 @@ describe('AssemblyAI paced PCM streaming', () => {
     const waits: number[] = []
     const session = new AssemblyAiLiveSession({
       tokenEndpoint: 'http://127.0.0.1:8787/assemblyai/token',
-      fetchImpl: vi.fn(async () =>
-        new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ token: 'temp-token', expiresInSeconds: 60 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
       ),
       WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
       nowMs: () => 100,
