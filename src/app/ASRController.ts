@@ -3,6 +3,7 @@ import type { CaptionState } from '../captions/CaptionState'
 import type { BenchmarkTelemetryDetails, BenchmarkTelemetryStage } from '../captions/latency'
 import type { ClientLogger } from '../observability/clientLogger'
 import type { RawAsrEvent } from '../types'
+import { createRenderScheduler, type RenderScheduler } from './renderScheduler'
 import type { TelemetryReporter } from './TelemetryReporter'
 
 export interface AsrLiveSession {
@@ -28,6 +29,8 @@ export interface ASRControllerOptions {
   sessionFactory: AsrLiveSessionFactory
   /** Forwarded after every transcript/visual-status update. */
   onShellRender: (status?: string) => void
+  /** Inject a custom scheduler (test only). Defaults to a 150ms throttle. */
+  renderSchedulerFactory?: (render: () => void) => RenderScheduler
 }
 
 /**
@@ -39,8 +42,12 @@ export interface ASRControllerOptions {
  */
 export class ASRController {
   private session: AsrLiveSession | undefined
+  private readonly renderScheduler: RenderScheduler
 
-  constructor(private readonly options: ASRControllerOptions) {}
+  constructor(private readonly options: ASRControllerOptions) {
+    const defaultFactory = (render: () => void) => createRenderScheduler({ render })
+    this.renderScheduler = (options.renderSchedulerFactory ?? defaultFactory)(() => this.options.onShellRender())
+  }
 
   isConnected(): boolean {
     return this.session !== undefined
@@ -48,11 +55,16 @@ export class ASRController {
 
   async connect(fixtureId = 'speech-smoke'): Promise<void> {
     this.options.logger.stage('asr_connect_start', { fixtureId })
+    this.renderScheduler.cancel()
     this.options.state.clear()
     this.session?.terminate()
     this.options.telemetry.start(fixtureId)
     this.session = this.options.sessionFactory({
       onTranscript: (event) => {
+        // State updates are immediate so the next render reflects the latest
+        // transcript regardless of debounce. Only the render call itself is
+        // throttled — partials collapse to one render per scheduler window;
+        // finals flush synchronously so the caption locks in without lag.
         this.options.state.applyAsrEvent(event)
         this.options.telemetry.mark('caption_formatted')
         this.options.telemetry.mark('display_update_sent')
@@ -61,7 +73,11 @@ export class ASRController {
           status: event.status,
           textLength: event.text.length,
         })
-        this.options.onShellRender()
+        if (event.status === 'final') {
+          this.renderScheduler.flushFinal()
+        } else {
+          this.renderScheduler.schedulePartial()
+        }
       },
       onVisualStatus: (status) => this.options.onShellRender(status),
       onTelemetry: (stage, details) => this.options.telemetry.mark(stage, details),
@@ -94,6 +110,7 @@ export class ASRController {
   }
 
   terminate(closeStatus?: string): void {
+    this.renderScheduler.cancel()
     this.session?.terminate(closeStatus)
     this.session = undefined
   }

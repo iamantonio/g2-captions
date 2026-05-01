@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ASRController, type AsrLiveSession, type AsrLiveSessionDeps } from '../../src/app/ASRController'
 import { CaptionState } from '../../src/captions/CaptionState'
 import { TelemetryReporter } from '../../src/app/TelemetryReporter'
+import type { RenderScheduler } from '../../src/app/renderScheduler'
 import type { ClientLogger } from '../../src/observability/clientLogger'
 import type { PcmChunk } from '../../src/audio/pcmFixture'
 import type { RawAsrEvent } from '../../src/types'
@@ -44,7 +45,12 @@ function makeLogger(): ClientLogger & {
   return { stage: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }
 
-function buildController(opts: { sessionFactoryImpl?: (deps: AsrLiveSessionDeps) => AsrLiveSession } = {}) {
+interface BuildControllerOpts {
+  sessionFactoryImpl?: (deps: AsrLiveSessionDeps) => AsrLiveSession
+  renderSchedulerFactory?: (render: () => void) => RenderScheduler
+}
+
+function buildController(opts: BuildControllerOpts = {}) {
   const state = new CaptionState()
   const telemetry = new TelemetryReporter()
   const logger = makeLogger()
@@ -58,7 +64,14 @@ function buildController(opts: { sessionFactoryImpl?: (deps: AsrLiveSessionDeps)
       sessions.push(session)
       return session
     })
-  const controller = new ASRController({ state, telemetry, logger, sessionFactory, onShellRender })
+  const controller = new ASRController({
+    state,
+    telemetry,
+    logger,
+    sessionFactory,
+    onShellRender,
+    ...(opts.renderSchedulerFactory ? { renderSchedulerFactory: opts.renderSchedulerFactory } : {}),
+  })
   return { state, telemetry, logger, onShellRender, sessions, controller }
 }
 
@@ -94,7 +107,7 @@ describe('ASRController', () => {
     expect(sessions[0].terminate).toHaveBeenCalled()
   })
 
-  it('forwards onTranscript events into CaptionState and re-renders the shell', async () => {
+  it('forwards a final transcript into CaptionState and renders the shell synchronously (immediate flush)', async () => {
     const { controller, state, sessions, onShellRender, telemetry, logger } = buildController()
     await controller.connect()
     onShellRender.mockClear()
@@ -109,6 +122,7 @@ describe('ASRController', () => {
 
     expect(state.segments()).toHaveLength(1)
     expect(state.segments()[0].text).toBe('hello world')
+    // Final → flushFinal() → synchronous render with no debounce delay.
     expect(onShellRender).toHaveBeenCalledWith()
     expect(logger.stage).toHaveBeenCalledWith('speaker_label_observed', {
       speaker: 'A',
@@ -118,6 +132,107 @@ describe('ASRController', () => {
     const report = telemetry.report()
     expect(report?.events.map((e) => e.stage)).toContain('caption_formatted')
     expect(report?.events.map((e) => e.stage)).toContain('display_update_sent')
+  })
+
+  it('partial transcripts route through the scheduler and do not render the shell synchronously', async () => {
+    const renders: Array<() => void> = []
+    const fakeScheduler = {
+      schedulePartial: vi.fn(() => {
+        // Capture the render fn as if a real scheduler had queued it.
+      }),
+      flushFinal: vi.fn(),
+      cancel: vi.fn(),
+      hasPending: vi.fn(() => false),
+    }
+    const { controller, sessions, onShellRender, state } = buildController({
+      renderSchedulerFactory: (render) => {
+        renders.push(render)
+        return fakeScheduler
+      },
+    })
+    await controller.connect()
+    onShellRender.mockClear()
+
+    sessions[0].capturedDeps.onTranscript({
+      text: 'partial text',
+      startMs: 0,
+      endMs: 500,
+      status: 'partial',
+      speaker: 'A',
+    } as RawAsrEvent)
+
+    // State is applied immediately so the next render reflects it.
+    expect(state.segments()[0].text).toBe('partial text')
+    // But the render call is deferred to the scheduler — no synchronous fire.
+    expect(onShellRender).not.toHaveBeenCalled()
+    expect(fakeScheduler.schedulePartial).toHaveBeenCalledOnce()
+    expect(fakeScheduler.flushFinal).not.toHaveBeenCalled()
+
+    // Manually invoke the captured render fn to confirm wiring.
+    renders[0]()
+    expect(onShellRender).toHaveBeenCalledWith()
+  })
+
+  it('a final after a pending partial calls flushFinal so the caption locks in immediately', async () => {
+    const fakeScheduler = {
+      schedulePartial: vi.fn(),
+      flushFinal: vi.fn(),
+      cancel: vi.fn(),
+      hasPending: vi.fn(() => false),
+    }
+    const { controller, sessions } = buildController({
+      renderSchedulerFactory: () => fakeScheduler,
+    })
+    await controller.connect()
+
+    sessions[0].capturedDeps.onTranscript({
+      text: 'partial',
+      startMs: 0,
+      endMs: 100,
+      status: 'partial',
+      speaker: 'A',
+    } as RawAsrEvent)
+    sessions[0].capturedDeps.onTranscript({
+      text: 'partial final',
+      startMs: 0,
+      endMs: 500,
+      status: 'final',
+      speaker: 'A',
+    } as RawAsrEvent)
+
+    expect(fakeScheduler.schedulePartial).toHaveBeenCalledOnce()
+    expect(fakeScheduler.flushFinal).toHaveBeenCalledOnce()
+  })
+
+  it('terminate() cancels any pending scheduler render', async () => {
+    const fakeScheduler = {
+      schedulePartial: vi.fn(),
+      flushFinal: vi.fn(),
+      cancel: vi.fn(),
+      hasPending: vi.fn(() => false),
+    }
+    const { controller } = buildController({
+      renderSchedulerFactory: () => fakeScheduler,
+    })
+    await controller.connect()
+    controller.terminate()
+    expect(fakeScheduler.cancel).toHaveBeenCalled()
+  })
+
+  it('connect() cancels any pending scheduler render before clearing state', async () => {
+    const fakeScheduler = {
+      schedulePartial: vi.fn(),
+      flushFinal: vi.fn(),
+      cancel: vi.fn(),
+      hasPending: vi.fn(() => false),
+    }
+    const { controller } = buildController({
+      renderSchedulerFactory: () => fakeScheduler,
+    })
+    await controller.connect()
+    fakeScheduler.cancel.mockClear()
+    await controller.connect()
+    expect(fakeScheduler.cancel).toHaveBeenCalled()
   })
 
   it('forwards session visual statuses through onShellRender so the deaf-first contract is preserved', async () => {
