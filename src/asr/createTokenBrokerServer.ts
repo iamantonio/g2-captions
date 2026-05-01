@@ -191,6 +191,19 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
       return
     }
 
+    // OPTIONS preflight is always allowed regardless of origin. CORS spec:
+    // browsers send these without auth headers, and the Access-Control-
+    // Allow-Origin response is what determines whether the browser will
+    // proceed with the actual request. The actual request (POST / GET) is
+    // bearer-gated below — origin allowlist is just defense-in-depth, not
+    // the real auth gate. Rejecting the preflight blocks the WebView from
+    // ever sending the actual call.
+    if (request.method === 'OPTIONS') {
+      response.writeHead(204)
+      response.end()
+      return
+    }
+
     // Origin filter — still applies for loopback dev callers (defense-in-
     // depth) and for any caller that doesn't present a valid bearer. The
     // ONE case we relax is a non-loopback caller with a valid bearer: a
@@ -206,14 +219,6 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
       logger.warn({ origin: origin ?? null, url: request.url }, 'http_origin_rejected')
       response.writeHead(403, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ error: 'origin_not_allowed' }))
-      return
-    }
-
-    // OPTIONS preflight is allowed without bearer (browsers send these without
-    // any auth headers per the CORS spec).
-    if (request.method === 'OPTIONS') {
-      response.writeHead(204)
-      response.end()
       return
     }
 

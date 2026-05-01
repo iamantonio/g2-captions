@@ -45,9 +45,19 @@ describe('token broker server config', () => {
     expect(getExtraAllowedOrigins({})).toEqual(new Set())
   })
 
-  it('CORS reply origin reflects an env-listed origin instead of the hardcoded loopback fallback', () => {
-    const env = { BROKER_ALLOWED_ORIGINS: 'https://hub.evenrealities.com' }
-    expect(getTokenBrokerCorsOrigin('https://hub.evenrealities.com', env)).toBe('https://hub.evenrealities.com')
-    expect(getTokenBrokerCorsOrigin('https://blocked.example.com', env)).toBe('http://127.0.0.1:5173')
+  it('CORS reply echoes back the caller Origin so browsers can accept the response', () => {
+    // ACAO is reflective — the actual security gate is the bearer/origin
+    // check on the request itself, not the CORS reply header. Echoing the
+    // origin lets browsers complete the round-trip; if the request was
+    // going to be rejected by the bearer/origin gate, the rejection has
+    // already happened with a 4xx by the time the response is built.
+    expect(getTokenBrokerCorsOrigin('https://hub.evenrealities.com')).toBe('https://hub.evenrealities.com')
+    expect(getTokenBrokerCorsOrigin('http://127.0.0.1:60564')).toBe('http://127.0.0.1:60564')
+    expect(getTokenBrokerCorsOrigin('https://anything.example.com')).toBe('https://anything.example.com')
+  })
+
+  it('CORS reply falls back to loopback Vite when the caller sends no Origin', () => {
+    expect(getTokenBrokerCorsOrigin(undefined)).toBe('http://127.0.0.1:5173')
+    expect(getTokenBrokerCorsOrigin('')).toBe('http://127.0.0.1:5173')
   })
 })

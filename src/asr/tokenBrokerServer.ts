@@ -49,7 +49,20 @@ export function isAllowedTokenBrokerOrigin(origin: string | undefined, env: Node
   }
 }
 
-export function getTokenBrokerCorsOrigin(origin: string | undefined, env: NodeJS.ProcessEnv = process.env): string {
-  if (origin && isAllowedTokenBrokerOrigin(origin, env)) return origin
+/**
+ * The Access-Control-Allow-Origin response header. We echo back the
+ * caller's Origin when it's present so the browser will accept the
+ * response — the actual security boundary is the bearer-token gate on
+ * the request, not the CORS reply. When the caller sends no Origin
+ * (curl, scripts), we fall back to a benign default that won't grant
+ * any browser meaningful access.
+ *
+ * Note: this is permissive on purpose. If the origin allowlist needs to
+ * be the security gate (e.g., bearer is unset and we're in pure dev
+ * mode), the rejection happens earlier on the actual request — by then
+ * we've already returned a 4xx, so the ACAO reflection doesn't matter.
+ */
+export function getTokenBrokerCorsOrigin(origin: string | undefined, _env: NodeJS.ProcessEnv = process.env): string {
+  if (origin && origin.length > 0) return origin
   return 'http://127.0.0.1:5173'
 }
