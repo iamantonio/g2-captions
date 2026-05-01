@@ -88,7 +88,7 @@ if (app) {
         void audio.stop('ASR TERMINATED')
         shell.render('ASR TERMINATED')
       },
-      onPauseCaptions: () => void audio.stop('CAPTIONS PAUSED — tap ring to resume'),
+      onPauseCaptions: () => void audio.stop('CAPTIONS PAUSED — double-tap ring to resume'),
       onResumeCaptions: () => void startG2SdkAudio(asr, audio),
     },
   })
@@ -106,15 +106,35 @@ async function initializeG2Display(shell: UIShell, asr: ASRController, audio: Au
     shell.attachG2Display(new G2LensDisplay(bridge))
     await shell.renderLens(shell.getLastFrameText())
 
-    // Wire ring + temple gestures. Single-tap is a context-aware "primary
-    // action" mirroring the on-screen Pause/Resume/Start button; double-
-    // tap is always End-session. Scroll gestures are routed but no-op
-    // until Phase 2 adds caption-history scrollback.
+    // Wire ring + temple gestures.
+    //
+    // Hardware-verified behavior (2026-05-01 broker logs, /docs/13):
+    // - Single-tap on the ring is RESERVED BY THE EVEN REALITIES OS for
+    //   menu back-navigation. It never reaches the WebView and we cannot
+    //   bind to it.
+    // - Double-tap arrives as sysEvent eventType:3 with eventSource:ring.
+    //   This is the only "press" gesture available to third-party apps.
+    // - Scroll up / scroll down arrive as textEvent on the focused
+    //   capture-target (our caption container), eventType:1 / 2. These
+    //   are routed through to onScrollUp / onScrollDown handlers but no-
+    //   op in Phase 1 (Phase 2 will use them for caption-history
+    //   scrollback).
+    //
+    // So double-tap is the ONLY tap gesture, which makes it the
+    // context-aware primary action: live → pause, paused → resume,
+    // idle/stopped → start. End-session stays on the on-screen
+    // "End session" link — no gesture for it (rare action, the on-
+    // screen affordance is fine).
     new GestureController({
       bridge: bridge as unknown as GestureBridge,
       logger,
-      onSingleTap: () => handleGestureSingleTap(asr, audio, shell),
-      onDoubleTap: () => handleGestureDoubleTap(asr, audio, shell),
+      onSingleTap: () => {
+        // OS-reserved on G2. We log the call so we can detect SDK
+        // changes (e.g., a future firmware that lets apps bind single-
+        // tap) — at that point this handler can be wired up.
+        logger.stage('gesture_single_tap_unbound')
+      },
+      onDoubleTap: () => handleGesturePrimaryAction(asr, audio, shell),
     })
 
     if (shouldAutoRunHardwareSmoke(new URL(window.location.href), true)) {
@@ -128,15 +148,16 @@ async function initializeG2Display(shell: UIShell, asr: ASRController, audio: Au
 }
 
 /**
- * Single-tap (ring or temple) maps to whatever the primary on-screen
- * button would do given the current lifecycle. Mirroring the button
- * keeps the gesture's behavior predictable: users learn one model and
- * apply it to either input surface.
+ * Double-tap is the only tap gesture available to apps on G2 (single-
+ * tap is OS-reserved for back-nav). So it maps to the primary on-screen
+ * action: live → pause, paused → resume, idle/stopped → start. End-
+ * session stays on the on-screen "End session" link — no gesture for
+ * it (rare action, the on-screen affordance is sufficient).
  */
-function handleGestureSingleTap(asr: ASRController, audio: AudioController, shell: UIShell): void {
+function handleGesturePrimaryAction(asr: ASRController, audio: AudioController, shell: UIShell): void {
   switch (shell.getLifecycle()) {
     case 'live':
-      void audio.stop('CAPTIONS PAUSED — tap ring to resume')
+      void audio.stop('CAPTIONS PAUSED — double-tap ring to resume')
       return
     case 'paused':
       void startG2SdkAudio(asr, audio)
@@ -147,22 +168,10 @@ function handleGestureSingleTap(asr: ASRController, audio: AudioController, shel
       return
     case 'connecting':
     default:
-      // Ignore single-taps while the connection is in flight — accidental
+      // Ignore double-taps while the connection is in flight — accidental
       // taps shouldn't double-trigger or queue actions.
       return
   }
-}
-
-/**
- * Double-tap (ring or temple) always ends the session. Idempotent when
- * already stopped — accidental double-taps in a stopped state shouldn't
- * cause errors.
- */
-function handleGestureDoubleTap(asr: ASRController, audio: AudioController, shell: UIShell): void {
-  if (shell.getLifecycle() === 'stopped' || shell.getLifecycle() === 'idle') return
-  asr.terminate('ASR TERMINATED')
-  void audio.stop('ASR TERMINATED')
-  shell.render('ASR TERMINATED')
 }
 
 async function runHardwareSpeechSmoke(asr: ASRController, shell: UIShell): Promise<void> {
