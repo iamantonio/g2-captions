@@ -74,7 +74,11 @@ describe('UIShell — production mode (default)', () => {
     const { root, shell } = build()
     shell.render('READY — starting caption check')
 
-    const visibleButtons = Array.from(root.querySelectorAll('button'))
+    // Limit to the controls footer — the confirm-overlay's Cancel button
+    // is also a <button> but lives inside a `hidden` overlay; query
+    // explicitly to keep this test focused on the controls strip.
+    const controls = root.querySelector('.g2-shell__controls')
+    const visibleButtons = Array.from(controls?.querySelectorAll('button') ?? [])
       .filter((b) => !b.hidden)
       .map((b) => b.textContent)
     expect(visibleButtons).toEqual(['Start captions'])
@@ -151,6 +155,52 @@ describe('UIShell — production mode (default)', () => {
     endSession.click()
     expect(handlers.onTerminate).toHaveBeenCalled()
     expect(logger.stage).toHaveBeenCalledWith('button_end_session')
+  })
+
+  it('end-confirmation overlay starts hidden and isEndConfirmationVisible() is false', () => {
+    const { root, shell } = build()
+    shell.render()
+    const overlay = root.querySelector('.g2-shell__confirm-overlay') as HTMLElement
+    expect(overlay).not.toBeNull()
+    expect(overlay.hidden).toBe(true)
+    expect(shell.isEndConfirmationVisible()).toBe(false)
+  })
+
+  it('setEndConfirmation(true) reveals the overlay with the End session? heading + countdown', () => {
+    const { root, shell } = build()
+    shell.render()
+    shell.setEndConfirmation(true)
+
+    const overlay = root.querySelector('.g2-shell__confirm-overlay') as HTMLElement
+    expect(overlay.hidden).toBe(false)
+    expect(shell.isEndConfirmationVisible()).toBe(true)
+    expect(root.querySelector('.g2-shell__confirm-heading')?.textContent).toBe('End session?')
+    expect(root.querySelector('.g2-shell__confirm-hint')?.textContent).toContain('Double-tap')
+    const countdown = root.querySelector('.g2-shell__confirm-countdown') as HTMLElement
+    expect(countdown.classList.contains('g2-shell__confirm-countdown--active')).toBe(true)
+  })
+
+  it('setEndConfirmation(false) hides the overlay and stops the countdown animation', () => {
+    const { root, shell } = build()
+    shell.render()
+    shell.setEndConfirmation(true)
+    shell.setEndConfirmation(false)
+
+    const overlay = root.querySelector('.g2-shell__confirm-overlay') as HTMLElement
+    expect(overlay.hidden).toBe(true)
+    expect(shell.isEndConfirmationVisible()).toBe(false)
+    const countdown = root.querySelector('.g2-shell__confirm-countdown') as HTMLElement
+    expect(countdown.classList.contains('g2-shell__confirm-countdown--active')).toBe(false)
+  })
+
+  it('clicking the overlay Cancel button hides the overlay and logs button_cancel_end_session', () => {
+    const { root, logger, shell } = build()
+    shell.render()
+    shell.setEndConfirmation(true)
+    const cancel = root.querySelector('.g2-shell__confirm-cancel') as HTMLButtonElement
+    cancel.click()
+    expect(shell.isEndConfirmationVisible()).toBe(false)
+    expect(logger.stage).toHaveBeenCalledWith('button_cancel_end_session')
   })
 
   it('disables the primary button while connecting so the user cannot double-trigger', () => {

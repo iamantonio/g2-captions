@@ -81,6 +81,9 @@ export class UIShell {
   private primaryButton: HTMLButtonElement | undefined
   private endSessionLink: HTMLButtonElement | undefined
   private primaryAction: 'start' | 'pause' | 'resume' = 'start'
+  private endConfirmOverlay: HTMLElement | undefined
+  private endConfirmCountdown: HTMLElement | undefined
+  private endConfirmVisible = false
 
   // Debug-mode DOM refs
   private debugFramePre: HTMLPreElement | undefined
@@ -110,6 +113,37 @@ export class UIShell {
 
   setLifecycle(next: AppLifecycle): void {
     this.lifecycle = next
+  }
+
+  /**
+   * Toggle the end-session confirmation overlay. Triggered by main.ts
+   * after a ring double-tap during a live or paused session — gives the
+   * user a 4-second window to double-tap again to confirm. The overlay
+   * dims the caption surface and shows a countdown so the gesture's
+   * effect is unmistakable. Called with `false` on confirm, on cancel,
+   * and on auto-timeout.
+   */
+  setEndConfirmation(visible: boolean): void {
+    this.endConfirmVisible = visible
+    const overlay = this.endConfirmOverlay
+    const countdown = this.endConfirmCountdown
+    if (!overlay || !countdown) return
+    if (visible) {
+      overlay.hidden = false
+      // Restart the countdown animation by toggling the class — direct
+      // animation restart on the same element requires a reflow trigger,
+      // and removing/adding the class is the cleanest way.
+      countdown.classList.remove('g2-shell__confirm-countdown--active')
+      void countdown.offsetWidth // force reflow so the next add re-runs the animation
+      countdown.classList.add('g2-shell__confirm-countdown--active')
+    } else {
+      overlay.hidden = true
+      countdown.classList.remove('g2-shell__confirm-countdown--active')
+    }
+  }
+
+  isEndConfirmationVisible(): boolean {
+    return this.endConfirmVisible
   }
 
   async renderLens(frameText: string): Promise<void> {
@@ -242,7 +276,55 @@ export class UIShell {
     controls.append(endSession)
     this.endSessionLink = endSession
 
-    container.append(header, captionRegion, controls)
+    // End-session confirmation overlay — hidden by default, surfaced by
+    // setEndConfirmation(true) when the user double-taps the ring during
+    // a live or paused session. Auto-cancel timing lives in main.ts; this
+    // module only renders the visual.
+    const confirmOverlay = this.doc.createElement('div')
+    confirmOverlay.className = 'g2-shell__confirm-overlay'
+    confirmOverlay.setAttribute('role', 'alertdialog')
+    confirmOverlay.setAttribute('aria-labelledby', 'g2-confirm-heading')
+    confirmOverlay.hidden = true
+
+    const confirmCard = this.doc.createElement('div')
+    confirmCard.className = 'g2-shell__confirm-card'
+
+    const confirmHeading = this.doc.createElement('h2')
+    confirmHeading.id = 'g2-confirm-heading'
+    confirmHeading.className = 'g2-shell__confirm-heading'
+    confirmHeading.textContent = 'End session?'
+
+    const confirmHint = this.doc.createElement('p')
+    confirmHint.className = 'g2-shell__confirm-hint'
+    confirmHint.textContent = 'Double-tap the ring again to confirm.'
+
+    const confirmCountdown = this.doc.createElement('div')
+    confirmCountdown.className = 'g2-shell__confirm-countdown'
+
+    const confirmActions = this.doc.createElement('div')
+    confirmActions.className = 'g2-shell__confirm-actions'
+    const cancelButton = this.doc.createElement('button')
+    cancelButton.className = 'g2-shell__confirm-cancel'
+    cancelButton.type = 'button'
+    cancelButton.textContent = 'Cancel'
+    cancelButton.addEventListener('click', () => {
+      this.options.logger.stage('button_cancel_end_session')
+      // Cancellation is also an "intent to dismiss the dialog without
+      // ending"; we surface it the same way the auto-timeout does, by
+      // hiding the overlay. main.ts owns the timer so it knows when to
+      // call setEndConfirmation(false) on cancel; here we proactively
+      // hide the visual and let main.ts catch up via the click handler.
+      this.setEndConfirmation(false)
+    })
+    confirmActions.append(cancelButton)
+
+    confirmCard.append(confirmHeading, confirmHint, confirmCountdown, confirmActions)
+    confirmOverlay.append(confirmCard)
+
+    this.endConfirmOverlay = confirmOverlay
+    this.endConfirmCountdown = confirmCountdown
+
+    container.append(header, captionRegion, controls, confirmOverlay)
     this.options.root.append(container)
   }
 

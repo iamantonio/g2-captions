@@ -149,21 +149,56 @@ async function initializeG2Display(shell: UIShell, asr: ASRController, audio: Au
 
 /**
  * Double-tap is the only tap gesture available to apps on G2 (single-
- * tap is OS-reserved for back-nav). So it maps to the primary on-screen
- * action: live → pause, paused → resume, idle/stopped → start. End-
- * session stays on the on-screen "End session" link — no gesture for
- * it (rare action, the on-screen affordance is sufficient).
+ * tap is OS-reserved for back-nav). It now opens an end-session
+ * confirmation overlay; a second double-tap within the confirm window
+ * actually terminates the session. From idle/stopped it just starts
+ * captions (no destructive action to confirm).
+ *
+ * Pause / resume stays on the on-screen primary button (no gesture
+ * for it now that double-tap is bound to the confirm flow). Phase 2
+ * may map a scroll gesture to pause/resume.
  */
+const END_CONFIRM_TIMEOUT_MS = 4000
+let endConfirmTimer: ReturnType<typeof setTimeout> | undefined
+
+function clearEndConfirmTimer(): void {
+  if (endConfirmTimer !== undefined) {
+    clearTimeout(endConfirmTimer)
+    endConfirmTimer = undefined
+  }
+}
+
 function handleGesturePrimaryAction(asr: ASRController, audio: AudioController, shell: UIShell): void {
+  // If a confirmation is already showing, the second double-tap commits
+  // the destructive action — terminate the session.
+  if (shell.isEndConfirmationVisible()) {
+    logger.stage('gesture_end_session_confirmed')
+    clearEndConfirmTimer()
+    shell.setEndConfirmation(false)
+    asr.terminate('ASR TERMINATED')
+    void audio.stop('ASR TERMINATED')
+    shell.render('ASR TERMINATED')
+    return
+  }
+
   switch (shell.getLifecycle()) {
     case 'live':
-      void audio.stop('CAPTIONS PAUSED — double-tap ring to resume')
+    case 'paused': {
+      // First double-tap during a live or paused session: open the
+      // confirmation dialog. Auto-dismiss in END_CONFIRM_TIMEOUT_MS.
+      logger.stage('gesture_end_session_prompted')
+      shell.setEndConfirmation(true)
+      clearEndConfirmTimer()
+      endConfirmTimer = setTimeout(() => {
+        logger.stage('gesture_end_session_timeout')
+        endConfirmTimer = undefined
+        shell.setEndConfirmation(false)
+      }, END_CONFIRM_TIMEOUT_MS)
       return
-    case 'paused':
-      void startG2SdkAudio(asr, audio)
-      return
+    }
     case 'idle':
     case 'stopped':
+      // Nothing destructive to confirm yet — just start captions.
       void startG2SdkAudio(asr, audio)
       return
     case 'connecting':

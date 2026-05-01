@@ -382,6 +382,146 @@ body {
   border-radius: 4px;
 }
 
+/* End-session confirmation overlay. Surfaced when the user double-taps
+ * the ring during a live or paused session. Dimmed backdrop, centered
+ * card, 4-second countdown animation as a horizontal progress bar.
+ * The user confirms with a second double-tap (handled in main.ts) or
+ * cancels via the Cancel button or by waiting for the timeout. */
+.g2-shell__confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: confirm-overlay-fade-in 160ms ease-out;
+}
+
+.g2-shell__confirm-overlay[hidden] {
+  display: none;
+}
+
+@keyframes confirm-overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.g2-shell__confirm-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--g2-surface);
+  border: 1px solid var(--g2-border);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+  animation: confirm-card-pop-in 180ms cubic-bezier(0.2, 0.9, 0.4, 1.2);
+}
+
+@keyframes confirm-card-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.g2-shell__confirm-heading {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--g2-text);
+}
+
+.g2-shell__confirm-hint {
+  margin: 0;
+  font-size: 15px;
+  color: var(--g2-text-muted);
+  line-height: 1.5;
+}
+
+.g2-shell__confirm-countdown {
+  height: 4px;
+  background: var(--g2-border);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+  margin-top: 8px;
+}
+
+/* The countdown bar shrinks from full width to zero over the timeout
+ * window. The animation re-runs whenever the overlay is shown by
+ * toggling the .--active class (UIShell forces a reflow between
+ * remove + add so the animation restarts). Duration matches
+ * END_CONFIRM_TIMEOUT_MS in main.ts. */
+.g2-shell__confirm-countdown::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--g2-error);
+  transform-origin: right center;
+  transform: scaleX(0);
+}
+
+.g2-shell__confirm-countdown--active::before {
+  transform: scaleX(1);
+  animation: confirm-countdown 4000ms linear forwards;
+}
+
+@keyframes confirm-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.g2-shell__confirm-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.g2-shell__confirm-cancel {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--g2-border);
+  color: var(--g2-text);
+  padding: 10px 24px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 120px;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.g2-shell__confirm-cancel:hover {
+  background: var(--g2-border);
+  border-color: var(--g2-text-muted);
+}
+
+.g2-shell__confirm-cancel:focus-visible {
+  outline: 3px solid var(--g2-text);
+  outline-offset: 2px;
+}
+
 [role='status'] {
   /* Inline lens-failure warnings appended by renderLens. */
   margin-top: var(--g2-spacing);
