@@ -111,3 +111,24 @@ Rationale:
 - `@evenrealities/even_hub_sdk` is pre-1.0; npm semver treats `^0.0.x` as exact, so no automatic minor/patch updates flow in. Dependabot is configured to surface new releases as PRs (D-4 fix), but each one needs human review.
 - The SDK is the only sanctioned BLE write path (D-0003) and a behavioral change in the bridge contract can break captioning silently. Any new release must pass a hardware smoke (per `docs/11-hardware-smoke.md`) before merge.
 - This decision documents the _intent_ behind the existing pin; no code change is required today.
+
+### D-0008 — Wearer-voice suppression: deferred until diarization works
+
+Status: Open — investigation pending Even Realities reply + diarization gap closure
+Decision: **Wearer-voice suppression ("don't transcribe my own voice, only show others") is a desired feature but is deferred until (a) Even Realities confirms whether the G2 SDK exposes a wearer-speaking signal, and (b) the diarization gap from `docs/13-first-hardware-run.md` is resolved.**
+
+Rationale:
+
+- The feature is genuinely valuable for the deaf-first product surface: the wearer doesn't need captions of themselves; they need captions of the people they're talking to.
+- Three implementation paths exist, each with a hard prerequisite:
+  - **Path 1 — Hardware signal** (cleanest): if the G2 SDK exposes a "wearer is speaking" event (bone-conduction sensor, dedicated VAD, or similar), gate `bridge.audioControl(true)` PCM forwarding on it. Today's SDK surface (`audioControl` + `onEvenHubEvent` audio events) does not document such a signal. **Action:** Tony to ask Even Realities directly.
+  - **Path 2 — Speaker enrollment + filter** (cleanest software-only): record a 15–30 s voice profile of the wearer, compute an embedding (Resemblyzer / SpeechBrain / a vendor that supports speaker enrollment), score each utterance against it on the broker side, drop matches before they reach the lens. **Hard blocker:** requires working diarization underneath. The 2026-05-01 hardware run returned `speaker: "0"` for both voices in a two-speaker session, so Path 2 has no foundation today. The diagnostic shipped in commit [`7e77767`](.) (`speakerWordCounts` in telemetry JSON) will tell the next conversational run whether the gap is a vendor / model limitation or a mapper bug — that decision feeds straight into this one.
+  - **Path 3 — Acoustic proximity heuristic** (cheap, unreliable): the wearer's voice is louder + closer; classify by RMS energy + spectral characteristics. ~80% accuracy is unacceptable for a deaf-first feature where false negatives hide other people's speech. Skip unless 1 and 2 both turn out infeasible.
+- If the diagnostic shows Deepgram itself can't separate the two voices on the G2's mono mic, this decision converges with the deferred Wave 3 fix #39 (strategy pattern + new vendor adapter). At that point the vendor swap stops being speculative architecture cleanup and becomes the unblock-step for both diarization _and_ wearer-voice suppression.
+- Until both prerequisites are answered, no code change here. This decision exists so the question doesn't get lost between hardware sessions.
+
+Pending actions:
+
+- Tony: ask Even Realities whether G2 has a wearer-speaking signal.
+- Next conversational hardware run: read `speakerWordCounts` in the telemetry JSON to close the diarization gap (vendor vs. mapper).
+- Reconvene this decision once both answers are in.
