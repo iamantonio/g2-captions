@@ -20,8 +20,10 @@ export type BenchmarkTelemetryStage =
   | 'websocket_open'
   | 'first_audio_chunk_sent'
   | 'final_audio_chunk_sent'
+  | 'provider_commit_sent'
   | 'provider_terminate_sent'
   | 'first_partial_received'
+  | 'partial_transcript_received'
   | 'final_transcript_received'
   | 'caption_formatted'
   | 'display_update_sent'
@@ -33,6 +35,10 @@ export interface BenchmarkTelemetryDetails {
   transcript?: string
   speaker?: string
   message?: string
+  eventType?: string
+  closeCode?: number
+  closeReason?: string
+  closeWasClean?: boolean
   /**
    * Diagnostic for Deepgram diarization. Emitted on partial / final events
    * only when the upstream response contained 2+ distinct word-level

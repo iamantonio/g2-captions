@@ -28,6 +28,8 @@ export interface UIShellOptions {
   documentImpl?: Document
   /** When true, exposes all internal controls + telemetry. Default false. */
   debug?: boolean
+  /** Optional fixed phrases shown for controlled provider hardware benchmark reads. */
+  hardwareBenchmarkPhrases?: readonly string[]
 }
 
 const DEFAULT_STATUS = 'READY — starting caption check'
@@ -235,6 +237,8 @@ export class UIShell {
 
     this.captionView = new CaptionView({ list, emptyState, documentImpl: this.doc })
 
+    const benchmarkPanel = this.buildBenchmarkPanel()
+
     const controls = this.doc.createElement('footer')
     controls.className = 'g2-shell__controls'
     const primary = this.doc.createElement('button')
@@ -324,8 +328,30 @@ export class UIShell {
     this.endConfirmOverlay = confirmOverlay
     this.endConfirmCountdown = confirmCountdown
 
-    container.append(header, captionRegion, controls, confirmOverlay)
+    if (benchmarkPanel) container.append(header, benchmarkPanel, captionRegion, controls, confirmOverlay)
+    else container.append(header, captionRegion, controls, confirmOverlay)
     this.options.root.append(container)
+  }
+
+  private buildBenchmarkPanel(): HTMLElement | undefined {
+    const phrases = this.options.hardwareBenchmarkPhrases
+    if (!phrases || phrases.length === 0) return undefined
+    const panel = this.doc.createElement('section')
+    panel.className = 'g2-shell__benchmark'
+    panel.setAttribute('aria-label', 'Hardware benchmark script')
+
+    const heading = this.doc.createElement('h2')
+    heading.textContent = 'Hardware benchmark script'
+    panel.append(heading)
+
+    const list = this.doc.createElement('ol')
+    phrases.forEach((phrase, index) => {
+      const item = this.doc.createElement('li')
+      item.textContent = `${index + 1}. ${phrase}`
+      list.append(item)
+    })
+    panel.append(list)
+    return panel
   }
 
   private updateProductionView(): void {
@@ -392,6 +418,9 @@ export class UIShell {
     container.append(details)
     this.debugTelemetryDetails = details
     this.debugTelemetryPre = reportPre
+
+    const benchmarkPanel = this.buildBenchmarkPanel()
+    if (benchmarkPanel) container.append(benchmarkPanel)
 
     this.mountDebugButtons(container)
     this.options.root.append(container)

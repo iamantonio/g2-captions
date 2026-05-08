@@ -20,6 +20,8 @@ Implemented so far:
 - Real speech PCM smoke fixture streaming
 - Structured latency telemetry and visible telemetry JSON
 - Multi-utterance fixture benchmark harness with WER-lite, vocabulary, and speaker-label scoring
+- Fixture-only provider comparison harness for Deepgram, ElevenLabs, and OpenAI
+- Experimental OpenAI realtime transcription provider behind explicit `?asr=openai`
 - Opt-in browser microphone prototype path after approval
 - Opt-in G2 SDK audio prototype path after approval
 - Lens-style text rendering helper
@@ -55,7 +57,8 @@ npm install -g @evenrealities/evenhub-cli @evenrealities/evenhub-simulator
 ```bash
 npm install
 cp .env.example .env
-# Fill ASSEMBLYAI_API_KEY locally only if running live AssemblyAI smoke tests.
+# Fill provider keys locally only when running that provider's broker/smoke path.
+# API keys stay server-side in .env; never put raw keys in WebView/client code.
 ```
 
 ## Scripts
@@ -65,18 +68,23 @@ npm test          # run Vitest suite
 npm run build     # type-check and build
 npm run prototype # run fixture-only prototype from Node
 npm run benchmark:fixtures # generate fixture-only benchmark JSON
+npm run benchmark:providers # compare Deepgram/ElevenLabs/OpenAI on bundled fixtures
+npm run smoke:deepgram      # Deepgram fixture smoke through the broker
+npm run smoke:elevenlabs    # ElevenLabs fixture smoke through the broker
+npm run smoke:openai        # OpenAI fixture smoke through the broker
 npm run hardware:readiness # print LAN QR/probe checklist for G2 smoke testing
-npm run token-broker       # local temporary-token broker (requires ASSEMBLYAI_API_KEY)
+npm run token-broker       # local broker/proxy (requires the provider key being tested)
 ```
 
-## Live AssemblyAI smoke test
+## Fixture-only provider smoke tests
 
-Live cloud ASR requires a local token broker so the browser app receives only temporary streaming tokens.
+Cloud ASR smoke tests require a local token broker so the browser app receives only brokered/proxied access. Raw provider API keys stay in `.env` on the server side only.
 
 Terminal 1:
 
 ```bash
-export ASSEMBLYAI_API_KEY="your_assemblyai_api_key_here"
+# Source only local .env values. Do not print API keys in logs/transcripts.
+set -a; source .env; set +a
 npm run token-broker
 ```
 
@@ -86,13 +94,32 @@ Terminal 2:
 npm run dev -- --port 5173
 ```
 
-Then open the local app and use:
+Then open one of these local fixture-only URLs and use `Stream Speech PCM Fixture`:
 
-1. `Connect AssemblyAI`
-2. `Stream Speech PCM Fixture`
-3. `Terminate` if needed
+```text
+http://127.0.0.1:5173/?debug=1&autoSmoke=0
+http://127.0.0.1:5173/?asr=openai&debug=1&autoSmoke=0
+http://127.0.0.1:5173/?asr=openai&debug=1&autoSmoke=0&fixture=two-speaker-captions.pcm
+http://127.0.0.1:5173/?asr=elevenlabs&debug=1&autoSmoke=0
+```
 
-This uses a controlled local PCM fixture, not live microphone or G2 audio.
+The default ASR provider remains Deepgram. Experimental providers require explicit flags:
+
+- OpenAI: `?asr=openai`
+- ElevenLabs: `?asr=elevenlabs`
+
+For CLI-only fixture checks:
+
+```bash
+npm run smoke:deepgram -- public/fixtures/speech-smoke.pcm
+npm run smoke:elevenlabs -- public/fixtures/speech-smoke.pcm
+npm run smoke:openai -- public/fixtures/two-speaker-captions.pcm
+npm run benchmark:providers
+```
+
+`?fixture=...` accepts only bundled filename-only `.pcm` fixtures, for example `two-speaker-captions.pcm`; full/remote URLs are rejected and fall back to `speech-smoke.pcm`.
+
+These paths use controlled bundled PCM fixtures, not live microphone or G2 audio. Do not proceed to browser mic, G2 SDK audio, or hardware cloud-audio tests without explicit approval.
 
 ## Packaging
 
@@ -109,7 +136,7 @@ Generated outputs (`dist/`, `*.ehpk`, `artifacts/`) are intentionally ignored.
 
 ## Deploying the broker (Fly.io)
 
-The token broker (`tools/token-broker.ts`) is a small Node service that gates the Deepgram + AssemblyAI credentials and proxies the Deepgram WebSocket. For dev, it runs on your Mac on `127.0.0.1:8787`. For shipping, deploy it to Fly.io so an installed `.ehpk` can reach it from anywhere.
+The token broker (`tools/token-broker.ts`) is a small Node service that gates provider credentials and proxies streaming paths. It currently supports Deepgram, ElevenLabs, AssemblyAI, and OpenAI provider seams, with Deepgram as the default app path. For dev, it runs on your Mac on `127.0.0.1:8787`. For shipping, deploy it to Fly.io so an installed `.ehpk` can reach it from anywhere.
 
 First-time setup:
 
@@ -127,6 +154,9 @@ fly secrets set DEEPGRAM_API_KEY="$(grep '^DEEPGRAM_API_KEY=' .env | cut -d= -f2
 fly secrets set VITE_BROKER_AUTH_TOKEN="$(grep '^VITE_BROKER_AUTH_TOKEN=' .env | cut -d= -f2-)"
 # Optional, only if you use the AssemblyAI seam:
 fly secrets set ASSEMBLYAI_API_KEY="$(grep '^ASSEMBLYAI_API_KEY=' .env | cut -d= -f2-)"
+# Optional, only if you use experimental providers:
+fly secrets set ELEVENLABS_API_KEY="$(grep '^ELEVENLABS_API_KEY=' .env | cut -d= -f2-)"
+fly secrets set OPENAI_API_KEY="$(grep '^OPENAI_API_KEY=' .env | cut -d= -f2-)"
 
 # 4. Deploy.
 fly deploy
@@ -155,6 +185,11 @@ The bearer token (`VITE_BROKER_AUTH_TOKEN`) is now baked into every shipped `.eh
 - `docs/09-fixture-benchmark.md` — multi-utterance fixture benchmark
 - `docs/10-live-audio-gates.md` — approved browser mic and G2 SDK audio capture gates
 - `docs/11-hardware-smoke.md` — hardware/device smoke plan
+- `docs/14-elevenlabs-scribe-v2-smoke.md` — ElevenLabs Scribe v2 realtime fixture smoke
+- `docs/15-openai-realtime-audio-review.md` — OpenAI realtime audio announcement review and provider plan
+- `docs/16-provider-fixture-comparison.md` — first fixture-only provider comparison
+- `docs/17-expanded-provider-fixture-comparison.md` — expanded provider comparison and OpenAI browser fixture re-smoke
+- `docs/18-openai-browser-mic-smoke.md` — OpenAI browser microphone path smoke
 
 ## Safety gate
 

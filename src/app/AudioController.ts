@@ -1,5 +1,7 @@
 import type { PcmChunk } from '../audio/pcmFixture'
 import type { G2AudioBridge } from '../audio/g2SdkAudio'
+import { buildHardwareBenchmarkScore } from '../benchmark/hardwareBenchmark'
+import type { BenchmarkTelemetryReport } from '../captions/latency'
 import type { ClientLogger } from '../observability/clientLogger'
 
 export interface LiveAudioSource {
@@ -21,7 +23,16 @@ export interface AudioControllerOptions {
   sendChunk: (chunk: PcmChunk) => Promise<void>
   browserMicFactory: (deps: LiveAudioSourceFactoryDeps) => LiveAudioSource
   g2SdkAudioFactory: (bridge: G2AudioBridge, deps: LiveAudioSourceFactoryDeps) => LiveAudioSource
+  getTelemetryReport?: () => BenchmarkTelemetryReport | undefined
+  hardwareBenchmarkPhrases?: readonly string[]
 }
+
+interface G2AudioStats {
+  chunkCount: number
+  audioDurationMs: number
+}
+
+const G2_CHUNK_LOG_EVERY = 25
 
 /**
  * Owns the active live PCM source (browser-mic or G2 SDK). Switching
@@ -32,6 +43,8 @@ export interface AudioControllerOptions {
  */
 export class AudioController {
   private liveAudioSource: LiveAudioSource | undefined
+  private activeSourceKind: 'browser_mic' | 'g2_sdk_audio' | undefined
+  private g2Stats: G2AudioStats | undefined
 
   constructor(private readonly options: AudioControllerOptions) {}
 
@@ -41,7 +54,10 @@ export class AudioController {
 
   async stop(status: string, render = true): Promise<void> {
     await this.liveAudioSource?.stop()
+    this.emitG2AudioSummaryIfNeeded()
     this.liveAudioSource = undefined
+    this.activeSourceKind = undefined
+    this.g2Stats = undefined
     if (render) this.options.onVisualStatus(status)
   }
 
@@ -51,6 +67,7 @@ export class AudioController {
       this.makeDeps('browser_mic', 'BROWSER MIC STREAM FAILED — captions paused'),
     )
     this.liveAudioSource = source
+    this.activeSourceKind = 'browser_mic'
     try {
       await source.start()
     } catch (err) {
@@ -74,6 +91,8 @@ export class AudioController {
       this.makeDeps('g2_sdk_audio', 'G2 MIC STREAM FAILED — captions paused'),
     )
     this.liveAudioSource = source
+    this.activeSourceKind = 'g2_sdk_audio'
+    this.g2Stats = { chunkCount: 0, audioDurationMs: 0 }
     try {
       this.options.logger.stage('g2_sdk_audio_source_start_call')
       await source.start()
@@ -90,7 +109,8 @@ export class AudioController {
       onError: (stage, err, details) => this.options.logger.error(stage, err, details),
       onStageLog: (stage, details) => this.options.logger.stage(stage, details),
       onChunk: async (chunk) => {
-        if (stagePrefix === 'g2_sdk_audio') {
+        const shouldLogG2Chunk = stagePrefix === 'g2_sdk_audio' && this.recordG2Chunk(chunk)
+        if (shouldLogG2Chunk) {
           this.options.logger.stage('g2_sdk_audio_chunk_send_start', {
             seq: chunk.seq,
             byteLength: chunk.data.byteLength,
@@ -99,14 +119,46 @@ export class AudioController {
         }
         try {
           await this.options.sendChunk(chunk)
-          if (stagePrefix === 'g2_sdk_audio') {
+          if (shouldLogG2Chunk) {
             this.options.logger.stage('g2_sdk_audio_chunk_send_done', { seq: chunk.seq })
           }
         } catch (err) {
           this.options.logger.error(`${stagePrefix}_chunk_send_failed`, err, { seq: chunk.seq })
+          await this.stop(sendFailureStatus, false)
           this.options.onVisualStatus(sendFailureStatus)
         }
       },
     }
+  }
+
+  private recordG2Chunk(chunk: PcmChunk): boolean {
+    if (!this.g2Stats) return false
+    this.g2Stats.chunkCount += 1
+    this.g2Stats.audioDurationMs += chunk.durationMs
+    return this.g2Stats.chunkCount === 1 || this.g2Stats.chunkCount % G2_CHUNK_LOG_EVERY === 0
+  }
+
+  private emitG2AudioSummaryIfNeeded(): void {
+    if (this.activeSourceKind !== 'g2_sdk_audio' || !this.g2Stats || this.g2Stats.chunkCount === 0) return
+    const report = this.options.getTelemetryReport?.()
+    const finalTranscripts =
+      report?.events
+        .filter((event) => event.stage === 'final_transcript_received' && typeof event.transcript === 'string')
+        .map((event) => event.transcript as string) ?? []
+    const benchmark = this.options.hardwareBenchmarkPhrases
+      ? buildHardwareBenchmarkScore({
+          expectedPhrases: this.options.hardwareBenchmarkPhrases,
+          observedFinalTranscripts: finalTranscripts,
+        })
+      : undefined
+    this.options.logger.stage('g2_sdk_audio_smoke_summary', {
+      provider: report?.provider,
+      fixtureId: report?.fixtureId,
+      chunkCount: this.g2Stats.chunkCount,
+      audioDurationMs: this.g2Stats.audioDurationMs,
+      finalTranscripts,
+      metrics: report?.metrics ?? {},
+      ...(benchmark ? { benchmark } : {}),
+    })
   }
 }

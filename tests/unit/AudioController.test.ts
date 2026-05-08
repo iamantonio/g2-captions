@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AudioController, type LiveAudioSource, type LiveAudioSourceFactoryDeps } from '../../src/app/AudioController'
+import { DEFAULT_HARDWARE_BENCHMARK_PHRASES } from '../../src/benchmark/hardwareBenchmark'
+import type { BenchmarkTelemetryReport } from '../../src/captions/latency'
 import type { ClientLogger } from '../../src/observability/clientLogger'
 import type { G2AudioBridge } from '../../src/audio/g2SdkAudio'
 import type { PcmChunk } from '../../src/audio/pcmFixture'
@@ -47,6 +49,8 @@ interface BuildOpts {
   browserMicSource?: FakeSource
   g2Source?: FakeSource
   sendChunkImpl?: (chunk: PcmChunk) => Promise<void>
+  telemetryReport?: BenchmarkTelemetryReport
+  hardwareBenchmarkPhrases?: readonly string[]
 }
 
 function buildController(opts: BuildOpts = {}) {
@@ -69,6 +73,8 @@ function buildController(opts: BuildOpts = {}) {
     sendChunk,
     browserMicFactory,
     g2SdkAudioFactory,
+    getTelemetryReport: opts.telemetryReport ? () => opts.telemetryReport : undefined,
+    hardwareBenchmarkPhrases: opts.hardwareBenchmarkPhrases,
   })
   return {
     logger,
@@ -152,20 +158,103 @@ describe('AudioController', () => {
     expect(sendChunk).toHaveBeenCalledWith(chunk)
     expect(onVisualStatus).toHaveBeenCalledWith('BROWSER MIC STREAM FAILED — captions paused')
     expect(logger.error).toHaveBeenCalledWith('browser_mic_chunk_send_failed', expect.any(Error), { seq: 7 })
+    expect(browserSource.stop).toHaveBeenCalled()
+    expect(controller.hasActiveSource()).toBe(false)
   })
 
-  it('G2 source onChunk emits start/done stage logs for hardware tracing', async () => {
+  it('G2 source onChunk emits compact hardware tracing only for first and periodic chunks', async () => {
     const { controller, g2Source, logger } = buildController()
     await controller.startG2SdkAudio(makeBridge())
-    const chunk: PcmChunk = { seq: 3, data: new ArrayBuffer(8), durationMs: 100 }
-    await g2Source.capturedDeps.onChunk(chunk)
+
+    for (let seq = 1; seq <= 26; seq += 1) {
+      const chunk: PcmChunk = { seq, data: new ArrayBuffer(8), durationMs: 100 }
+      await g2Source.capturedDeps.onChunk(chunk)
+    }
 
     expect(logger.stage).toHaveBeenCalledWith('g2_sdk_audio_chunk_send_start', {
-      seq: 3,
+      seq: 1,
       byteLength: 8,
       durationMs: 100,
     })
-    expect(logger.stage).toHaveBeenCalledWith('g2_sdk_audio_chunk_send_done', { seq: 3 })
+    expect(logger.stage).toHaveBeenCalledWith('g2_sdk_audio_chunk_send_done', { seq: 1 })
+    expect(logger.stage).toHaveBeenCalledWith('g2_sdk_audio_chunk_send_start', {
+      seq: 25,
+      byteLength: 8,
+      durationMs: 100,
+    })
+    expect(logger.stage).toHaveBeenCalledWith('g2_sdk_audio_chunk_send_done', { seq: 25 })
+    expect(logger.stage).not.toHaveBeenCalledWith('g2_sdk_audio_chunk_send_start', expect.objectContaining({ seq: 2 }))
+    expect(logger.stage).not.toHaveBeenCalledWith('g2_sdk_audio_chunk_send_done', { seq: 2 })
+  })
+
+  it('stop() emits a compact G2 SDK audio summary with final transcripts and metrics', async () => {
+    const telemetryReport: BenchmarkTelemetryReport = {
+      provider: 'openai',
+      fixtureId: 'g2-sdk-audio',
+      startedAtMs: 1000,
+      events: [
+        { stage: 'websocket_open', atMs: 1000 },
+        { stage: 'first_audio_chunk_sent', atMs: 1100, seq: 1 },
+        { stage: 'final_transcript_received', atMs: 3200, transcript: 'First final.' },
+        { stage: 'display_update_sent', atMs: 3201 },
+        { stage: 'final_transcript_received', atMs: 5200, transcript: 'Second final.' },
+      ],
+      metrics: {
+        firstPartialFromFirstAudioMs: 800,
+        finalTranscriptFromFirstAudioMs: 2100,
+        displayUpdateFromFinalTranscriptMs: 1,
+      },
+    }
+    const { controller, g2Source, logger } = buildController({ telemetryReport })
+    await controller.startG2SdkAudio(makeBridge())
+    await g2Source.capturedDeps.onChunk({ seq: 1, data: new ArrayBuffer(3200), durationMs: 100 })
+    await g2Source.capturedDeps.onChunk({ seq: 2, data: new ArrayBuffer(3200), durationMs: 100 })
+    await controller.stop('LIVE AUDIO STOPPED — captions paused')
+
+    expect(logger.stage).toHaveBeenCalledWith('g2_sdk_audio_smoke_summary', {
+      provider: 'openai',
+      fixtureId: 'g2-sdk-audio',
+      chunkCount: 2,
+      audioDurationMs: 200,
+      finalTranscripts: ['First final.', 'Second final.'],
+      metrics: telemetryReport.metrics,
+    })
+  })
+
+  it('stop() includes benchmark scoring when hardware benchmark phrases are configured', async () => {
+    const telemetryReport: BenchmarkTelemetryReport = {
+      provider: 'deepgram',
+      fixtureId: 'g2-sdk-audio',
+      startedAtMs: 1000,
+      events: [
+        { stage: 'final_transcript_received', atMs: 3000, transcript: 'OpenAI g two summary telemetry test.' },
+        {
+          stage: 'final_transcript_received',
+          atMs: 5000,
+          transcript: 'Proven machine captions are live on the glasses.',
+        },
+      ],
+      metrics: {},
+    }
+    const { controller, g2Source, logger } = buildController({
+      telemetryReport,
+      hardwareBenchmarkPhrases: DEFAULT_HARDWARE_BENCHMARK_PHRASES.slice(0, 2),
+    })
+    await controller.startG2SdkAudio(makeBridge())
+    await g2Source.capturedDeps.onChunk({ seq: 1, data: new ArrayBuffer(3200), durationMs: 100 })
+    await controller.stop('LIVE AUDIO STOPPED — captions paused')
+
+    expect(logger.stage).toHaveBeenCalledWith(
+      'g2_sdk_audio_smoke_summary',
+      expect.objectContaining({
+        benchmark: expect.objectContaining({
+          expectedPhraseCount: 2,
+          observedFinalCount: 2,
+          exactMatchCount: 1,
+          exactMatchRate: 0.5,
+        }),
+      }),
+    )
   })
 
   it('G2 source visual statuses bubble through onVisualStatus and stage logs through logger.stage', async () => {

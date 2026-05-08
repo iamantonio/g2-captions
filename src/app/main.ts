@@ -3,6 +3,9 @@ import { BrowserMicrophonePcmSource } from '../audio/browserMicrophone'
 import { G2SdkAudioSource, type G2AudioBridge } from '../audio/g2SdkAudio'
 import { chunkPcmS16Le, createSilentPcmS16LeFixture, loadPcmS16LeFixtureFromUrl } from '../audio/pcmFixture'
 import { DeepgramLiveSession } from '../asr/DeepgramLiveSession'
+import { ElevenLabsLiveSession } from '../asr/ElevenLabsLiveSession'
+import { OpenAiLiveSession } from '../asr/OpenAiLiveSession'
+import { DEFAULT_HARDWARE_BENCHMARK_PHRASES, isHardwareBenchmarkMode } from '../benchmark/hardwareBenchmark'
 import { CaptionState } from '../captions/CaptionState'
 import { G2LensDisplay } from '../display/g2LensDisplay'
 import { createClientLogger } from '../observability/clientLogger'
@@ -11,10 +14,18 @@ import { AudioController } from './AudioController'
 import { GestureController, type GestureBridge } from './GestureController'
 import { runFixturePrototype } from './runFixturePrototype'
 import {
+  getAsrProvider,
   getBrokerAuthToken,
   getClientLogEndpoint,
+  getDeepgramKeyterms,
+  getDeepgramRealtimeOptions,
   getDefaultStreamingEndpoint,
   getDefaultTokenEndpoint,
+  getElevenLabsRealtimeOptions,
+  getElevenLabsKeyterms,
+  getElevenLabsTokenEndpoint,
+  getOpenAiRealtimeOptions,
+  getOpenAiStreamingEndpoint,
   getSpeechFixtureUrl,
   isDebugMode,
   shouldAutoRunHardwareSmoke,
@@ -25,12 +36,14 @@ import { UIShell } from './UIShell'
 const app = document.querySelector<HTMLElement>('#app')
 const state = new CaptionState()
 const locationUrl = new URL(window.location.href)
+const asrProvider = getAsrProvider(locationUrl)
+const hardwareBenchmarkPhrases = isHardwareBenchmarkMode(locationUrl) ? DEFAULT_HARDWARE_BENCHMARK_PHRASES : undefined
 const logger = createClientLogger({
   endpoint: getClientLogEndpoint(locationUrl),
   href: window.location.href,
   brokerAuthToken: getBrokerAuthToken(),
 })
-const telemetry = new TelemetryReporter({ provider: 'deepgram' })
+const telemetry = new TelemetryReporter({ provider: asrProvider })
 let g2AudioBridge: G2AudioBridge | undefined
 
 if (app) {
@@ -40,14 +53,35 @@ if (app) {
     state,
     telemetry,
     logger,
-    sessionFactory: (deps) =>
-      new DeepgramLiveSession({
+    sessionFactory: (deps) => {
+      if (asrProvider === 'elevenlabs') {
+        return new ElevenLabsLiveSession({
+          tokenEndpoint: getElevenLabsTokenEndpoint(locationUrl),
+          brokerAuthToken: getBrokerAuthToken(),
+          keyterms: getElevenLabsKeyterms(locationUrl),
+          realtimeOptions: getElevenLabsRealtimeOptions(locationUrl),
+          manualCommitEveryChunks: getElevenLabsRealtimeOptions(locationUrl).manualCommitEveryChunks,
+          ...deps,
+        })
+      }
+      if (asrProvider === 'openai') {
+        return new OpenAiLiveSession({
+          streamingEndpoint: getOpenAiStreamingEndpoint(locationUrl),
+          brokerAuthToken: getBrokerAuthToken(),
+          language: 'en',
+          ...getOpenAiRealtimeOptions(locationUrl),
+          ...deps,
+        })
+      }
+      return new DeepgramLiveSession({
         tokenEndpoint: getDefaultTokenEndpoint(locationUrl),
         streamingEndpoint: getDefaultStreamingEndpoint(locationUrl),
         brokerAuthToken: getBrokerAuthToken(),
-        keyterms: ['ProvenMachine'],
+        keyterms: getDeepgramKeyterms(locationUrl),
+        streamingOptions: getDeepgramRealtimeOptions(locationUrl),
         ...deps,
-      }),
+      })
+    },
     onShellRender: (status) => shell.render(status),
   })
 
@@ -68,6 +102,8 @@ if (app) {
         onVisualStatus: deps.onVisualStatus,
         onStageLog: deps.onStageLog,
       }),
+    getTelemetryReport: () => telemetry.report(),
+    hardwareBenchmarkPhrases,
   })
 
   const shell = new UIShell({
@@ -76,6 +112,7 @@ if (app) {
     telemetry,
     logger,
     debug: isDebugMode(locationUrl),
+    hardwareBenchmarkPhrases,
     handlers: {
       onConnectDeepgram: () => void asr.connect(),
       onStreamSilentFixture: () => void streamSilentFixture(asr, shell),

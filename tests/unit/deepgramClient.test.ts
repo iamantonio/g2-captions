@@ -20,8 +20,21 @@ describe('Deepgram streaming client configuration', () => {
     expect(url.searchParams.get('smart_format')).toBe('true')
     expect(url.searchParams.get('punctuate')).toBe('true')
     expect(url.searchParams.get('diarize')).toBe('true')
+    expect(url.searchParams.get('endpointing')).toBe('250')
     expect(url.searchParams.getAll('keyterm')).toEqual(['ProvenMachine', 'Even Realities G2'])
     expect(url.toString()).not.toContain('dg-temp-token')
+  })
+
+  it('applies Deepgram tuning overrides for hardware A/B URLs', () => {
+    const url = buildDeepgramStreamingUrl({
+      endpointing: 750,
+      interimResults: true,
+      keyterms: [],
+    })
+
+    expect(url.searchParams.get('endpointing')).toBe('750')
+    expect(url.searchParams.get('interim_results')).toBe('true')
+    expect(url.searchParams.getAll('keyterm')).toEqual([])
   })
 
   it('rejects missing temporary tokens so API keys are never embedded in the WebView', () => {

@@ -7,6 +7,7 @@ import {
   mapDeepgramResultsToRawAsrEvent,
   validateDeepgramAccessToken,
   type DeepgramResultsEvent,
+  type DeepgramStreamingUrlOptions,
 } from './DeepgramStreamingClient'
 
 export interface DeepgramLiveSessionOptions {
@@ -30,6 +31,7 @@ export interface DeepgramLiveSessionOptions {
    */
   brokerAuthToken?: string
   keyterms?: string[]
+  streamingOptions?: Omit<DeepgramStreamingUrlOptions, 'baseUrl' | 'keyterms'>
   sleep?: (ms: number) => Promise<void>
 }
 
@@ -47,6 +49,7 @@ export class DeepgramLiveSession {
   // firstPartialFromFirstAudioMs / finalTranscriptFromFirstAudioMs metrics
   // are unreachable for any browser-mic or G2 SDK session.
   private sentFirstAudioChunk = false
+  private receivedFirstPartial = false
   private readonly fetchImpl: typeof fetch
   private readonly WebSocketCtor: typeof WebSocket
   private readonly nowMs: () => number
@@ -66,7 +69,11 @@ export class DeepgramLiveSession {
     this.markTelemetry('token_request_end')
 
     this.options.onVisualStatus('CONNECTING — ASR')
-    const url = buildDeepgramStreamingUrl({ baseUrl: this.options.streamingEndpoint, keyterms: this.options.keyterms })
+    const url = buildDeepgramStreamingUrl({
+      baseUrl: this.options.streamingEndpoint,
+      keyterms: this.options.keyterms,
+      ...this.options.streamingOptions,
+    })
     if (this.options.brokerAuthToken) {
       url.searchParams.set('auth', this.options.brokerAuthToken)
     }
@@ -191,10 +198,14 @@ export class DeepgramLiveSession {
       if (mapped.speaker && mapped.speaker !== '?') telemetryDetails.speaker = mapped.speaker
       const speakerWordCounts = computeMultiSpeakerWordCounts(mapped.words)
       if (speakerWordCounts) telemetryDetails.speakerWordCounts = speakerWordCounts
-      this.markTelemetry(
-        mapped.status === 'final' ? 'final_transcript_received' : 'first_partial_received',
-        telemetryDetails,
-      )
+      if (mapped.status === 'final') {
+        this.markTelemetry('final_transcript_received', telemetryDetails)
+      } else if (!this.receivedFirstPartial) {
+        this.receivedFirstPartial = true
+        this.markTelemetry('first_partial_received', telemetryDetails)
+      } else {
+        this.markTelemetry('partial_transcript_received', telemetryDetails)
+      }
       this.options.onTranscript(mapped)
     } catch (err) {
       this.options.onError?.('asr_message_parse_failed', err)

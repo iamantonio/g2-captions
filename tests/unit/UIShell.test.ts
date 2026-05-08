@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UIShell, lifecycleFromStatus, type UIShellHandlers } from '../../src/app/UIShell'
+import { DEFAULT_HARDWARE_BENCHMARK_PHRASES } from '../../src/benchmark/hardwareBenchmark'
 import { CaptionState } from '../../src/captions/CaptionState'
 import { TelemetryReporter } from '../../src/app/TelemetryReporter'
 import type { ClientLogger } from '../../src/observability/clientLogger'
@@ -31,6 +32,7 @@ function makeHandlers(): { [K in keyof UIShellHandlers]: ReturnType<typeof vi.fn
 interface BuildOpts {
   recorderEvents?: number
   debug?: boolean
+  hardwareBenchmarkPhrases?: readonly string[]
 }
 
 function makeRoot(): HTMLElement {
@@ -61,7 +63,15 @@ function build(opts: BuildOpts = {}) {
   })
   const logger = makeLogger()
   const handlers = makeHandlers()
-  const shell = new UIShell({ root, state, telemetry, logger, handlers, debug: opts.debug ?? false })
+  const shell = new UIShell({
+    root,
+    state,
+    telemetry,
+    logger,
+    handlers,
+    debug: opts.debug ?? false,
+    hardwareBenchmarkPhrases: opts.hardwareBenchmarkPhrases,
+  })
   return { root, state, telemetry, logger, handlers, shell }
 }
 
@@ -242,6 +252,18 @@ describe('UIShell — production mode (default)', () => {
     expect(region?.getAttribute('aria-label')).toBe('Live captions')
   })
 
+  it('shows the fixed hardware benchmark phrase list when configured', () => {
+    const { root, shell } = build({ hardwareBenchmarkPhrases: DEFAULT_HARDWARE_BENCHMARK_PHRASES })
+    shell.render()
+
+    const panel = root.querySelector('.g2-shell__benchmark') as HTMLElement | null
+    expect(panel).not.toBeNull()
+    expect(panel?.querySelector('h2')?.textContent).toBe('Hardware benchmark script')
+    expect(Array.from(panel?.querySelectorAll('li') ?? []).map((item) => item.textContent)).toEqual(
+      DEFAULT_HARDWARE_BENCHMARK_PHRASES.map((phrase, index) => `${index + 1}. ${phrase}`),
+    )
+  })
+
   it('hides the telemetry JSON panel even when events exist (production)', () => {
     const { telemetry, root, shell } = build({ recorderEvents: 1 })
     telemetry.start('test')
@@ -281,6 +303,16 @@ describe('UIShell — production mode (default)', () => {
 describe('UIShell — debug mode (?debug=1)', () => {
   beforeEach(() => {
     document.body.replaceChildren()
+  })
+
+  it('debug mode also shows the hardware benchmark phrase list above developer controls', () => {
+    const { root, shell } = build({ debug: true, hardwareBenchmarkPhrases: DEFAULT_HARDWARE_BENCHMARK_PHRASES })
+    shell.render()
+
+    expect(root.querySelector('.g2-shell__benchmark h2')?.textContent).toBe('Hardware benchmark script')
+    expect(root.querySelector('.g2-shell__benchmark li')?.textContent).toBe(
+      `1. ${DEFAULT_HARDWARE_BENCHMARK_PHRASES[0]}`,
+    )
   })
 
   it('renders all seven action buttons', () => {

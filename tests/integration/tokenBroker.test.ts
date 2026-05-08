@@ -51,6 +51,12 @@ describe('token broker HTTP routes', () => {
           headers: { 'content-type': 'application/json' },
         })
       }
+      if (url.startsWith('https://api.elevenlabs.io/v1/single-use-token/realtime_scribe')) {
+        return new Response(JSON.stringify({ token: 'el-single-use-token-123' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
       return new Response('not found', { status: 404 })
     })
     vi.stubGlobal('fetch', upstreamMock)
@@ -59,6 +65,7 @@ describe('token broker HTTP routes', () => {
       logger: silentLogger(),
       deepgramApiKey: 'dg-test-api-key',
       assemblyAiApiKey: 'aai-test-api-key',
+      elevenLabsApiKey: 'el-test-api-key',
       version: 'test-1.0',
     })
     await new Promise<void>((resolve) => handle.server.listen(0, '127.0.0.1', resolve))
@@ -121,6 +128,21 @@ describe('token broker HTTP routes', () => {
       .expect((res) => {
         expect(res.body).toMatchObject({ token: 'aai-temp-token-123', expiresInSeconds: 60 })
       })
+  })
+
+  it('mints an ElevenLabs Scribe realtime single-use token when origin is loopback Vite', async () => {
+    await supertestRequest(handle.server)
+      .post('/elevenlabs/token')
+      .set('Origin', brokerOrigin(handle.server).replace(/:\d+$/, ':5173'))
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ token: 'el-single-use-token-123', expiresInSeconds: 900 })
+      })
+    const call = upstreamCalls.find((c) =>
+      c.url.startsWith('https://api.elevenlabs.io/v1/single-use-token/realtime_scribe'),
+    )
+    expect(call).toBeDefined()
+    expect(call?.init?.headers).toEqual({ 'xi-api-key': 'el-test-api-key' })
   })
 
   it('accepts a /client-log payload with stage and rejects payloads missing stage', async () => {
@@ -283,19 +305,28 @@ describe('token broker rate limiting', () => {
 
 describe('token broker WebSocket proxy', () => {
   let handle: TokenBrokerHandle
-  let upstream: WebSocketServer
-  let upstreamPort: number
+  let deepgramUpstream: WebSocketServer
+  let openAiUpstream: WebSocketServer
+  let deepgramUpstreamPort: number
+  let openAiUpstreamPort: number
 
   beforeAll(async () => {
-    upstream = new WebSocketServer({ port: 0, host: '127.0.0.1' })
-    await new Promise<void>((resolve) => upstream.once('listening', () => resolve()))
-    upstreamPort = (upstream.address() as AddressInfo).port
+    deepgramUpstream = new WebSocketServer({ port: 0, host: '127.0.0.1' })
+    openAiUpstream = new WebSocketServer({ port: 0, host: '127.0.0.1' })
+    await Promise.all([
+      new Promise<void>((resolve) => deepgramUpstream.once('listening', () => resolve())),
+      new Promise<void>((resolve) => openAiUpstream.once('listening', () => resolve())),
+    ])
+    deepgramUpstreamPort = (deepgramUpstream.address() as AddressInfo).port
+    openAiUpstreamPort = (openAiUpstream.address() as AddressInfo).port
 
     handle = createTokenBrokerServer({
       logger: silentLogger(),
       deepgramApiKey: 'dg-test',
-      // Steer the proxy at our local mock instead of api.deepgram.com.
-      deepgramStreamingOptions: { baseUrl: `ws://127.0.0.1:${upstreamPort}/v1/listen` },
+      openAiApiKey: 'openai-test-api-key',
+      // Steer the proxies at our local mocks instead of vendor hosts.
+      deepgramStreamingOptions: { baseUrl: `ws://127.0.0.1:${deepgramUpstreamPort}/v1/listen` },
+      openAiRealtimeUrl: `ws://127.0.0.1:${openAiUpstreamPort}/v1/realtime?intent=transcription`,
       version: 'test-ws',
     })
     await new Promise<void>((resolve) => handle.server.listen(0, '127.0.0.1', resolve))
@@ -303,13 +334,16 @@ describe('token broker WebSocket proxy', () => {
 
   afterAll(async () => {
     await handle.shutdown(2_000)
-    await new Promise<void>((resolve) => upstream.close(() => resolve()))
+    await Promise.all([
+      new Promise<void>((resolve) => deepgramUpstream.close(() => resolve())),
+      new Promise<void>((resolve) => openAiUpstream.close(() => resolve())),
+    ])
   })
 
   it('forwards browser audio frames upstream and ignores client query parameters', async () => {
     const upstreamReceived: Buffer[] = []
     let upstreamUrl = ''
-    upstream.once('connection', (ws, request) => {
+    deepgramUpstream.once('connection', (ws, request) => {
       upstreamUrl = request.url ?? ''
       ws.on('message', (data) => upstreamReceived.push(data as Buffer))
     })
@@ -325,5 +359,30 @@ describe('token broker WebSocket proxy', () => {
     expect(upstreamUrl).not.toContain('nova-3-medical')
     expect(upstreamUrl).not.toContain('extra=evil')
     expect(upstreamReceived.length).toBeGreaterThan(0)
+  })
+
+  it('forwards OpenAI realtime JSON frames through the broker with server-side bearer auth', async () => {
+    const upstreamReceived: Buffer[] = []
+    let upstreamAuth = ''
+    let upstreamUrl = ''
+    openAiUpstream.once('connection', (ws, request) => {
+      upstreamAuth = request.headers.authorization ?? ''
+      upstreamUrl = request.url ?? ''
+      ws.on('message', (data) => upstreamReceived.push(data as Buffer))
+    })
+
+    await supertestRequest(handle.server)
+      .ws('/openai/transcribe?api_key=client-secret-must-not-forward')
+      .set('Origin', 'http://127.0.0.1:5173')
+      .sendText(JSON.stringify({ type: 'input_audio_buffer.append', audio: 'AAAA' }))
+      .wait(50)
+      .close()
+
+    expect(upstreamAuth).toBe('Bearer openai-test-api-key')
+    expect(upstreamUrl).toBe('/v1/realtime?intent=transcription')
+    expect(upstreamUrl).not.toContain('client-secret-must-not-forward')
+    expect(upstreamReceived.map((buf) => buf.toString('utf8'))).toContain(
+      JSON.stringify({ type: 'input_audio_buffer.append', audio: 'AAAA' }),
+    )
   })
 })

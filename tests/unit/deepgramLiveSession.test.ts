@@ -50,6 +50,7 @@ describe('DeepgramLiveSession', () => {
       onTranscript,
       onVisualStatus,
       keyterms: ['ProvenMachine'],
+      streamingOptions: { endpointing: 750, diarize: false, interimResults: true },
     })
 
     await session.connect()
@@ -57,6 +58,8 @@ describe('DeepgramLiveSession', () => {
     expect(FakeWebSocket.instances).toHaveLength(1)
     expect(FakeWebSocket.instances[0].url).toContain('api.deepgram.com/v1/listen')
     expect(new URL(FakeWebSocket.instances[0].url).searchParams.getAll('keyterm')).toEqual(['ProvenMachine'])
+    expect(new URL(FakeWebSocket.instances[0].url).searchParams.get('endpointing')).toBe('750')
+    expect(new URL(FakeWebSocket.instances[0].url).searchParams.get('diarize')).toBe('false')
     expect(FakeWebSocket.instances[0].protocols).toEqual(['token', 'dg-temp-token'])
     expect(onVisualStatus).toHaveBeenCalledWith('CONNECTING — token')
     expect(onVisualStatus).toHaveBeenCalledWith('CONNECTING — ASR')

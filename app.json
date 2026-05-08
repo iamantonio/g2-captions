@@ -9,9 +9,11 @@
   "permissions": [
     {
       "name": "network",
-      "desc": "Connects to the deployed g2-captions broker (which proxies Deepgram Streaming Speech-to-Text) for approved live caption sessions.",
+      "desc": "Connects to the deployed g2-captions broker plus approved ASR streaming origins for live caption sessions.",
       "whitelist": [
         "https://api.deepgram.com",
+        "https://api.elevenlabs.io",
+        "wss://api.elevenlabs.io",
         "https://g2-captions-broker.fly.dev",
         "wss://g2-captions-broker.fly.dev"
       ]

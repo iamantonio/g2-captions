@@ -3,6 +3,7 @@ import { createServerLogger } from '../src/observability/serverLogger'
 import { createTokenBrokerServer } from '../src/asr/createTokenBrokerServer'
 import { getTokenBrokerBindHost } from '../src/asr/tokenBrokerServer'
 import { readDeepgramApiKeyFromEnv } from '../src/asr/DeepgramTokenBroker'
+import { readElevenLabsApiKeyFromEnv } from '../src/asr/ElevenLabsTokenBroker'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
@@ -28,7 +29,17 @@ const port = parseBrokerPort(
 )
 const host = getTokenBrokerBindHost(process.env)
 const deepgramApiKey = readDeepgramApiKeyFromEnv(process.env)
+let elevenLabsApiKey: string | undefined
+try {
+  elevenLabsApiKey = readElevenLabsApiKeyFromEnv(process.env)
+} catch {
+  logger.warn('ELEVENLABS_API_KEY is unset; /elevenlabs/token will return 404 until configured.')
+}
 const assemblyAiApiKey = process.env.ASSEMBLYAI_API_KEY?.trim()
+const openAiApiKey = process.env.OPENAI_API_KEY?.trim()
+if (!openAiApiKey) {
+  logger.warn('OPENAI_API_KEY is unset; /openai/transcribe will return 404 until configured.')
+}
 
 // 10 token mints per IP per minute. Generous enough that a developer-driven
 // dev session never trips it; tight enough that a misbehaving caller can't
@@ -60,6 +71,8 @@ const { server, shutdown } = createTokenBrokerServer({
   logger,
   deepgramApiKey,
   assemblyAiApiKey,
+  elevenLabsApiKey,
+  openAiApiKey,
   brokerAuthToken,
   rateLimiter: { consume: (key) => rateLimiter.consume(key).then(() => undefined) },
   version: readVersion(),

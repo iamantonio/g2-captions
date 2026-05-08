@@ -7,6 +7,7 @@ import { getTokenBrokerCorsOrigin, isAllowedTokenBrokerOrigin } from './tokenBro
 import { buildDeepgramProxyHeaders } from './DeepgramProxy'
 import { buildDeepgramStreamingUrl, type DeepgramStreamingUrlOptions } from './DeepgramStreamingClient'
 import { createDeepgramToken } from './DeepgramTokenBroker'
+import { createElevenLabsRealtimeToken } from './ElevenLabsTokenBroker'
 
 const REQUEST_BODY_BYTE_CAP = 10_000
 // ~1 MB ≈ 30 seconds of 16 kHz / 16-bit / mono audio. Beyond this we close the
@@ -21,6 +22,14 @@ export interface TokenBrokerDeps {
   logger: ServerLogger
   deepgramApiKey: string
   assemblyAiApiKey?: string
+  elevenLabsApiKey?: string
+  openAiApiKey?: string
+  /**
+   * Test-only override for the OpenAI realtime transcription upstream. The
+   * default points at OpenAI directly; browser clients only connect to the
+   * broker's /openai/transcribe path.
+   */
+  openAiRealtimeUrl?: string
   /**
    * Server-controlled Deepgram streaming parameters. The broker — not the
    * client — is the sole authority on which model/feature combination gets
@@ -146,8 +155,17 @@ function rawDataByteLength(data: RawData): number {
   return (data as Buffer).length
 }
 
+function safeCloseCode(code: number): number {
+  // ws emits reserved/no-status codes like 1005 when a peer drops without a
+  // close frame; those are observable locally but invalid to send onward.
+  if (code === 1005 || code === 1006 || code === 1015) return 1000
+  if (code >= 1000 && code < 5000) return code
+  return 1000
+}
+
 export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandle {
-  const { logger, deepgramApiKey, assemblyAiApiKey, rateLimiter, brokerAuthToken } = deps
+  const { logger, deepgramApiKey, assemblyAiApiKey, elevenLabsApiKey, openAiApiKey, rateLimiter, brokerAuthToken } =
+    deps
   const retention = deps.clientLogRetention ?? 200
   const version = deps.version ?? 'unknown'
   const clientLogs: unknown[] = []
@@ -308,6 +326,29 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
       return
     }
 
+    if (request.method === 'POST' && request.url === '/elevenlabs/token' && elevenLabsApiKey) {
+      if (rateLimiter) {
+        try {
+          await rateLimiter.consume(clientKey(request))
+        } catch {
+          response.writeHead(429, { 'content-type': 'application/json', 'retry-after': '60' })
+          response.end(JSON.stringify({ error: 'rate_limited' }))
+          return
+        }
+      }
+      try {
+        const token = await createElevenLabsRealtimeToken({ apiKey: elevenLabsApiKey })
+        logger.info({ expiresInSeconds: token.expiresInSeconds }, 'elevenlabs_token_minted')
+        response.writeHead(200, { 'content-type': 'application/json' })
+        response.end(JSON.stringify(token))
+      } catch (err) {
+        logger.error({ err }, 'elevenlabs_token_failed')
+        response.writeHead(502, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: 'token_generation_failed' }))
+      }
+      return
+    }
+
     response.writeHead(404, { 'content-type': 'application/json' })
     response.end(JSON.stringify({ error: 'not_found' }))
   })
@@ -330,8 +371,15 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
       'ws_upgrade_request',
     )
 
-    if (pathname !== '/deepgram/listen') {
+    if (pathname !== '/deepgram/listen' && pathname !== '/openai/transcribe') {
       logger.warn({ pathname }, 'ws_upgrade_path_rejected')
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
+      socket.destroy()
+      return
+    }
+
+    if (pathname === '/openai/transcribe' && !openAiApiKey) {
+      logger.warn({ pathname }, 'ws_upgrade_openai_unconfigured')
       socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
       socket.destroy()
       return
@@ -366,12 +414,21 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
     })
   })
 
-  proxyServer.on('connection', (browserSocket: WebSocket) => {
+  proxyServer.on('connection', (browserSocket: WebSocket, request: IncomingMessage) => {
+    const pathname = new URL(request.url ?? '/', 'ws://localhost').pathname
+    const isOpenAiProxy = pathname === '/openai/transcribe'
     // Server-controlled streaming parameters — fix #36. The browser's WS query
     // string is ignored; whatever the broker config says, that's what gets
     // billed.
-    const upstreamUrl = buildDeepgramStreamingUrl(deps.deepgramStreamingOptions)
-    const upstreamSocket = new WebSocket(upstreamUrl, { headers: buildDeepgramProxyHeaders(deepgramApiKey) })
+    const upstreamUrl = isOpenAiProxy
+      ? (deps.openAiRealtimeUrl ?? 'wss://api.openai.com/v1/realtime?intent=transcription')
+      : buildDeepgramStreamingUrl(deps.deepgramStreamingOptions)
+    const upstreamSocket = new WebSocket(
+      upstreamUrl,
+      isOpenAiProxy
+        ? { headers: { Authorization: `Bearer ${openAiApiKey}` } }
+        : { headers: buildDeepgramProxyHeaders(deepgramApiKey) },
+    )
     const pair = { browser: browserSocket, upstream: upstreamSocket }
     activeProxyPairs.add(pair)
     const pendingBrowserMessages: Array<{ data: RawData; isBinary: boolean }> = []
@@ -383,10 +440,10 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
       closing = true
       activeProxyPairs.delete(pair)
       if (browserSocket.readyState === WebSocket.OPEN || browserSocket.readyState === WebSocket.CONNECTING) {
-        browserSocket.close(code, reason)
+        browserSocket.close(safeCloseCode(code), reason)
       }
       if (upstreamSocket.readyState === WebSocket.OPEN || upstreamSocket.readyState === WebSocket.CONNECTING) {
-        upstreamSocket.close(code, reason)
+        upstreamSocket.close(safeCloseCode(code), reason)
       }
     }
 
@@ -424,14 +481,14 @@ export function createTokenBrokerServer(deps: TokenBrokerDeps): TokenBrokerHandl
     browserSocket.on('close', (code, reason) => {
       activeProxyPairs.delete(pair)
       if (upstreamSocket.readyState === WebSocket.OPEN || upstreamSocket.readyState === WebSocket.CONNECTING) {
-        upstreamSocket.close(code, reason)
+        upstreamSocket.close(safeCloseCode(code), reason)
       }
     })
 
     upstreamSocket.on('close', (code, reason) => {
       activeProxyPairs.delete(pair)
       if (browserSocket.readyState === WebSocket.OPEN || browserSocket.readyState === WebSocket.CONNECTING) {
-        browserSocket.close(code, reason)
+        browserSocket.close(safeCloseCode(code), reason)
       }
     })
 
